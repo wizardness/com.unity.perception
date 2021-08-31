@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.Randomization.Parameters;
 using UnityEngine.Perception.Randomization.Randomizers;
 using UnityEngine.Perception.Randomization.Samplers;
 using UnityEngine.Perception.Randomization.Scenarios.Serialization;
+using UnityEngine.SceneManagement;
 
 namespace UnityEngine.Perception.Randomization.Scenarios
 {
@@ -343,6 +346,9 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             {
                 foreach (var randomizer in activeRandomizers)
                     randomizer.ScenarioComplete();
+
+                TrackScenarioCompleted();
+
                 OnComplete();
                 state = State.Idle;
                 OnIdle();
@@ -498,6 +504,19 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             /// The scenario has finished and is idle
             /// </summary>
             Idle
+        }
+
+        static void TrackScenarioCompleted()
+        {
+            var perceptionCamera = SceneManager.GetActiveScene()
+                .GetRootGameObjects()
+                .Select(obj => obj.GetComponentInChildren<PerceptionCamera>())
+                .FirstOrDefault(x => x != null);
+
+            PerceptionEngineAnalytics.ReportScenarioCompleted(
+                perceptionCamera,
+                activeScenario.randomizers
+            );
         }
 
         public void RestartIteration()
