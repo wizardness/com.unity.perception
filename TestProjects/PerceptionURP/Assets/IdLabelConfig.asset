@@ -23,5 +23,13 @@ MonoBehaviour:
     id: 4
   - label: Character
     id: 5
+  - label: Create
+    id: 6
+  - label: Decal
+    id: 7
+  - label: Wall
+    id: 8
+  - label: Block
+    id: 9
   autoAssignIds: 1
   startingLabelId: 1

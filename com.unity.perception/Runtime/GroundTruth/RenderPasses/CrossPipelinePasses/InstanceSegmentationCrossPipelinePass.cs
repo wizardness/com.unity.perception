@@ -70,6 +70,35 @@ namespace UnityEngine.Perception.GroundTruth
                 Debug.LogError($"Could not get a unique color for {instanceId}");
 
             mpb.SetVector(k_SegmentationIdProperty, (Color)color);
+
+            if (renderer && renderer.material)
+            {
+                if (renderer.material.HasProperty("_MainTex"))
+                {
+                    var maintex = renderer.material.GetTexture("_MainTex");
+                    if (maintex)
+                        mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
+                }
+
+                mpb.SetColor("_BaseColor", renderer.material.color);
+
+            }
+
+            var segBeh = renderer? renderer.gameObject.GetComponent<SemanticSegmentationBehaviour>() : null;
+            if (segBeh)
+            {
+                if (segBeh.useSegmentationMask)
+                {
+                    mpb.SetFloat("_TextureIsSegmentationMask", 1);
+                    if (segBeh.useSegmentationMask)
+                    {
+                        mpb.SetTexture("_MainTex", segBeh.segmentationMask);
+                    }
+                }
+
+                mpb.SetFloat("_TransparencyThreshold", segBeh.opacityThreshold);
+            }
+
 #if PERCEPTION_DEBUG
             Debug.Log($"Assigning id. Frame {Time.frameCount} id {id}");
 #endif

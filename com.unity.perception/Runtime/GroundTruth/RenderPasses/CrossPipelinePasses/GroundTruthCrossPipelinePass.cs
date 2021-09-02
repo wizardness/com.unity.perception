@@ -79,7 +79,7 @@ namespace UnityEngine.Perception.GroundTruth
             {
                 rendererConfiguration = PerObjectData.None,
                 renderQueueRange = new RenderQueueRange { lowerBound = 0, upperBound = 5000 },
-                sortingCriteria = SortingCriteria.CommonOpaque,
+                sortingCriteria = SortingCriteria.BackToFront,
                 excludeObjectMotionVectors = false,
                 overrideMaterial = overrideMaterial,
                 overrideMaterialPassIndex = overrideMaterialPassIndex,

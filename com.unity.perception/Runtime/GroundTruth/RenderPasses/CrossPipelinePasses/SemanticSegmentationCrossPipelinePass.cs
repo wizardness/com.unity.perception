@@ -35,17 +35,16 @@ namespace UnityEngine.Perception.GroundTruth
             base.Setup();
             m_ClassLabelingShader = Shader.Find(k_ShaderName);
 
-            var shaderVariantCollection = new ShaderVariantCollection();
+            //var shaderVariantCollection = new ShaderVariantCollection();
 
-            if (shaderVariantCollection != null)
-            {
-                shaderVariantCollection.Add(
-                    new ShaderVariantCollection.ShaderVariant(m_ClassLabelingShader, PassType.ScriptableRenderPipeline));
-            }
+            // if (shaderVariantCollection != null)
+            // {
+            //     shaderVariantCollection.Add(
+            //         new ShaderVariantCollection.ShaderVariant(m_ClassLabelingShader, PassType.ScriptableRenderPipeline));
+            // }
 
             m_OverrideMaterial = new Material(m_ClassLabelingShader);
-
-            shaderVariantCollection.WarmUp();
+            //shaderVariantCollection.WarmUp();
         }
 
         protected override void ExecutePass(
@@ -78,6 +77,33 @@ namespace UnityEngine.Perception.GroundTruth
 
             // Set the labeling ID so that it can be accessed in ClassSemanticSegmentationPass.shader
             mpb.SetVector(k_LabelingId, found ? entry.color : Color.black);
+
+            if (renderer && renderer.material)
+            {
+                if (renderer.material.HasProperty("_MainTex"))
+                {
+                    var maintex = renderer.material.GetTexture("_MainTex");
+                    if (maintex)
+                        mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
+                }
+                mpb.SetColor("_BaseColor", renderer.material.color);
+            }
+
+            var segBeh = renderer? renderer.gameObject.GetComponent<SemanticSegmentationBehaviour>() : null;
+            if (segBeh)
+            {
+                if (segBeh.useSegmentationMask)
+                {
+                    mpb.SetFloat("_TextureIsSegmentationMask", 1);
+                    if (segBeh.useSegmentationMask)
+                    {
+                        mpb.SetTexture("_MainTex", segBeh.segmentationMask);
+                    }
+                }
+
+                mpb.SetFloat("_TransparencyThreshold", segBeh.opacityThreshold);
+            }
+
         }
 
         public override void ClearMaterialProperties(MaterialPropertyBlock mpb, Renderer renderer, Labeling labeling, uint instanceId)
