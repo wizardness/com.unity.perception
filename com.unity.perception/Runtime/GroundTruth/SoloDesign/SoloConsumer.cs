@@ -15,6 +15,11 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
 
         SimulationMetadata m_CurrentMetadata;
 
+        void Start()
+        {
+            // Only here to get the check mark to show up in Unity Editor
+        }
+
         public override void OnSimulationStarted(SimulationMetadata metadata)
         {
             Debug.Log("SC - On Simulation Started");
@@ -106,7 +111,7 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             {
                 switch (annotation)
                 {
-                    case BoundingBoxAnnotation bbox:
+                    case BoundingBox2DLabeler.BoundingBoxAnnotation bbox:
                         annotations.Add(ConvertAnnotation(frame, bbox));
                         break;
                     case InstanceSegmentation seg:
@@ -191,7 +196,7 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             return token;
         }
 
-        static JToken ConvertAnnotation(Frame frame, BoundingBoxAnnotation bbox)
+        static JToken ConvertAnnotation(Frame frame, BoundingBox2DLabeler.BoundingBoxAnnotation bbox)
         {
             var outBox = ToAnnotationHeader(frame, bbox);
             var values = new JArray();

@@ -78,13 +78,13 @@ namespace UnityEngine.Perception.GroundTruth
         }
 
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxes3DReceived");
-        AnnotationDefinition m_AnnotationDefinition;
+//        AnnotationDefinition m_AnnotationDefinition;
 
         Dictionary<int, AsyncAnnotation> m_AsyncAnnotations;
         Dictionary<int, Dictionary<uint, BoxData>> m_BoundingBoxValues;
         List<BoxData> m_ToReport;
 
-        int m_CurrentFrame;
+//        int m_CurrentFrame;
 
 
         /// <summary>
@@ -120,10 +120,12 @@ namespace UnityEngine.Perception.GroundTruth
         {
             if (idLabelConfig == null)
                 throw new InvalidOperationException("BoundingBox3DLabeler's idLabelConfig field must be assigned");
-
+#if false
             m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("bounding box 3D", idLabelConfig.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
-
+#else
+//            m_AnnotationDefinition = new AnnotationDefinition();
+#endif
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderObjectInfosCalculated;
 
             m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
@@ -177,6 +179,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
+#if false
             m_CurrentFrame = Time.frameCount;
 
             m_BoundingBoxValues[m_CurrentFrame] = new Dictionary<uint, BoxData>();
@@ -185,6 +188,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             foreach (var label in LabelManager.singleton.registeredLabels)
                 ProcessLabel(label);
+#endif
         }
 
         void OnRenderObjectInfosCalculated(int frameCount, NativeArray<RenderedObjectInfo> renderedObjectInfos)
@@ -213,7 +217,7 @@ namespace UnityEngine.Perception.GroundTruth
                 }
 
                 BoundingBoxComputed?.Invoke(frameCount, m_ToReport);
-                asyncAnnotation.ReportValues(m_ToReport);
+//                asyncAnnotation.ReportValues(m_ToReport);
             }
         }
 
@@ -302,7 +306,7 @@ namespace UnityEngine.Perception.GroundTruth
 
                     var converted = ConvertToBoxData(labelEntry, labeledEntity.instanceId, combinedBounds.center, combinedBounds.extents, cameraRotation);
 
-                    m_BoundingBoxValues[m_CurrentFrame][labeledEntity.instanceId] = converted;
+//                    m_BoundingBoxValues[m_CurrentFrame][labeledEntity.instanceId] = converted;
                 }
             }
         }

@@ -12,7 +12,6 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.Exporters;
-using UnityEngine.Perception.GroundTruth.Exporters.PerceptionFormat;
 using UnityEngine.Perception.Randomization.Samplers;
 using UnityEngine.Perception.Randomization.Scenarios;
 using UnityEngine.SceneManagement;
@@ -49,11 +48,11 @@ namespace UnityEditor.Perception.Randomization
         TextField m_BuildPathField;
         TextField m_SelectedBuildPathTextField;
         TextField m_BuildIdField;
-
+#if false
         string[] m_OutputFormats;
         ToolbarMenu m_OutputFormatMenu;
         int m_OutputFormatIndex;
-
+#endif
         [MenuItem("Window/Run in Unity Simulation")]
         static void ShowWindow()
         {
@@ -128,7 +127,7 @@ namespace UnityEditor.Perception.Randomization
                 new Random().NextBytes(bytes);
                 m_RandomSeedField.value = BitConverter.ToUInt32(bytes, 0);
             };
-
+#if false
             m_OutputFormats = TypeCache.GetTypesDerivedFrom<IDatasetExporter>().Select(exporter => exporter.Name).ToArray();
             m_OutputFormatMenu = root.Q<ToolbarMenu>("output-format");
             var i = 0;
@@ -143,10 +142,10 @@ namespace UnityEditor.Perception.Randomization
                         m_OutputFormatMenu.text = format;
                     });
             }
-
+#endif
             m_SysParamDefinitions = API.GetSysParams();
             m_SysParamMenu = root.Q<ToolbarMenu>("sys-param");
-            for (i = 0; i < m_SysParamDefinitions.Length; i++)
+            for (var i = 0; i < m_SysParamDefinitions.Length; i++)
             {
                 var index = i;
                 var param = m_SysParamDefinitions[i];
@@ -248,7 +247,7 @@ namespace UnityEditor.Perception.Randomization
             m_PrevExecutionIdLabel.text = $"Execution ID: {PlayerPrefs.GetString("SimWindow/prevExecutionId")}";
             m_PrevRandomSeedLabel.text = $"Random Seed: {PlayerPrefs.GetString("SimWindow/prevRandomSeed")}";
 
-            m_OutputFormatMenu.text = PlayerPrefs.GetString(SimulationState.outputFormatMode, nameof(PerceptionExporter));
+//            m_OutputFormatMenu.text = PlayerPrefs.GetString(SimulationState.outputFormatMode, nameof(PerceptionExporter));
         }
 
         static string IncrementRunName(string runName)
@@ -291,7 +290,7 @@ namespace UnityEditor.Perception.Randomization
                 scenarioConfig = (TextAsset)m_ScenarioConfigField.value,
                 currentOpenScenePath = SceneManager.GetSceneAt(0).path,
                 currentScenario = FindObjectOfType<ScenarioBase>(),
-                outputFormat = m_OutputFormats[m_OutputFormatIndex]
+//                outputFormat = m_OutputFormats[m_OutputFormatIndex]
             };
             var runGuid = Guid.NewGuid();
             PerceptionEditorAnalytics.ReportRunInUnitySimulationStarted(
@@ -462,7 +461,7 @@ namespace UnityEditor.Perception.Randomization
             constants["totalIterations"] = m_RunParameters.totalIterations;
             constants["instanceCount"] = m_RunParameters.instanceCount;
             constants["randomSeed"] = m_RunParameters.randomSeed;
-            constants["outputFormat"] = m_RunParameters.outputFormat;
+//            constants["outputFormat"] = m_RunParameters.outputFormat;
 
             var appParamName = $"{m_RunParameters.runName}";
             var appParamsString = JsonConvert.SerializeObject(configuration, Formatting.Indented);
@@ -509,7 +508,7 @@ namespace UnityEditor.Perception.Randomization
             PlayerPrefs.SetInt("SimWindow/sysParamIndex", m_RunParameters.sysParamIndex);
             PlayerPrefs.SetString("SimWindow/scenarioConfig",
                 m_RunParameters.scenarioConfig != null ? m_RunParameters.scenarioConfigAssetPath : string.Empty);
-            PlayerPrefs.SetString(SimulationState.outputFormatMode, m_RunParameters.outputFormat);
+//            PlayerPrefs.SetString(SimulationState.outputFormatMode, m_RunParameters.outputFormat);
 
             SetFieldsFromPlayerPreferences();
         }
@@ -524,7 +523,7 @@ namespace UnityEditor.Perception.Randomization
             public TextAsset scenarioConfig;
             public string currentOpenScenePath;
             public ScenarioBase currentScenario;
-            public string outputFormat;
+//            public string outputFormat;
 
             public string scenarioConfigAssetPath => AssetDatabase.GetAssetPath(scenarioConfig);
         }

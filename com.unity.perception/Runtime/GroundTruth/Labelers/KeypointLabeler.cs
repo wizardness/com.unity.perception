@@ -49,7 +49,7 @@ namespace UnityEngine.Perception.GroundTruth
         public KeypointObjectFilter objectFilter;
         // ReSharper restore MemberCanBePrivate.Global
 
-        AnnotationDefinition m_AnnotationDefinition;
+//        AnnotationDefinition m_AnnotationDefinition;
         Texture2D m_MissingTexture;
 
         Dictionary<int, (AsyncAnnotation annotation, Dictionary<uint, KeypointEntry> keypoints)> m_AsyncAnnotations;
@@ -92,10 +92,12 @@ namespace UnityEngine.Perception.GroundTruth
         {
             if (idLabelConfig == null)
                 throw new InvalidOperationException($"{nameof(KeypointLabeler)}'s idLabelConfig field must be assigned");
-
+#if false
             m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("keypoints", TemplateToJson(activeTemplate, idLabelConfig),
                 "pixel coordinates of keypoints in a model, along with skeletal connectivity data", id: new Guid(annotationId));
-
+#else
+//            m_AnnotationDefinition = new AnnotationDefinition();
+#endif
             // Texture to use in case the template does not contain a texture for the joints or the skeletal connections
             m_MissingTexture = new Texture2D(1, 1);
 
@@ -236,13 +238,14 @@ namespace UnityEngine.Perception.GroundTruth
 
             //This code assumes that OnRenderedObjectInfoReadback will be called immediately after OnInstanceSegmentationImageReadback
             KeypointsComputed?.Invoke(frameCount, m_KeypointEntriesToReport);
-            asyncAnnotation.annotation.ReportValues(m_KeypointEntriesToReport);
+//            asyncAnnotation.annotation.ReportValues(m_KeypointEntriesToReport);
         }
 
         /// <param name="scriptableRenderContext"></param>
         /// <inheritdoc/>
         protected override void OnEndRendering(ScriptableRenderContext scriptableRenderContext)
         {
+#if false
             m_CurrentFrame = Time.frameCount;
 
             var annotation = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_AnnotationDefinition);
@@ -252,6 +255,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             foreach (var label in LabelManager.singleton.registeredLabels)
                 ProcessLabel(m_CurrentFrame, label);
+#endif
         }
 
         // ReSharper disable InconsistentNaming

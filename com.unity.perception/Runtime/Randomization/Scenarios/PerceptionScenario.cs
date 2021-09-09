@@ -18,7 +18,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// <summary>
         /// The metric definition used to report the current scenario iteration
         /// </summary>
-        MetricDefinition m_IterationMetricDefinition;
+//        MetricDefinition m_IterationMetricDefinition;
 
         /// <summary>
         /// The scriptable render pipeline hook used to capture perception data skips the first frame of the simulation
@@ -43,6 +43,10 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// <inheritdoc/>
         protected override void OnStart()
         {
+            var md = new GroundTruth.SoloDesign.MetricDefinition();
+            DatasetCapture.Instance.RegisterMetricDefinition(md);
+
+#if false
             m_IterationMetricDefinition = DatasetCapture.Instance.RegisterMetricDefinition(
                 "scenario_iteration", "Iteration information for dataset sequences",
                 Guid.Parse(k_ScenarioIterationMetricDefinitionId));
@@ -52,16 +56,19 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                 "The random seed used to initialize the random state of the simulation. Only triggered once per simulation.",
                 Guid.Parse("14adb394-46c0-47e8-a3f0-99e754483b76"));
             DatasetCapture.Instance.ReportMetric(randomSeedMetricDefinition, new[] { genericConstants.randomSeed });
+#endif
         }
 
         /// <inheritdoc/>
         protected override void OnIterationStart()
         {
             DatasetCapture.Instance.StartNewSequence();
+#if false
             DatasetCapture.Instance.ReportMetric(m_IterationMetricDefinition, new[]
             {
                 new IterationMetricData { iteration = currentIteration }
             });
+#endif
         }
 
         /// <inheritdoc/>
@@ -71,7 +78,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             Manager.Instance.Shutdown();
             Quit();
         }
-
+#if false
         /// <summary>
         /// Used to report a scenario iteration as a perception metric
         /// </summary>
@@ -80,5 +87,6 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             // ReSharper disable once NotAccessedField.Local
             public int iteration;
         }
+#endif
     }
 }

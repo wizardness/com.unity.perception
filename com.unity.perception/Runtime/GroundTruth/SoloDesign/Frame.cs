@@ -46,7 +46,7 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
         {
 
         }
-        public virtual void OnMetricRegistered() { }
+        public virtual void OnMetricRegistered(MetricDefinition metricDefinition) { }
 
         /// <summary>
         /// Called at the end of each frame. Contains all of the generated data for the
@@ -193,6 +193,11 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             this.id = id;
             this.description = description;
             this.annotationType = annotationType;
+        }
+
+        public virtual bool IsValid()
+        {
+            return id != string.Empty && description != string.Empty && annotationType != string.Empty;
         }
 
         public virtual void ToMessage(IMessageBuilder builder)
@@ -476,7 +481,7 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             builder.AddString("annotation_type", annotationType);
         }
     }
-
+#if false
     /// <summary>
     /// Bounding boxes for all of the labeled objects in a capture
     /// </summary>
@@ -526,6 +531,17 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
                 e.ToMessage(nested);
             }
         }
+    }
+#endif
+
+    [Serializable]
+    public class InstanceSegmentationDefinition : AnnotationDefinition
+    {
+        static readonly string k_Id = "instance segmentation";
+        static readonly string k_Description = "You know the deal";
+        static readonly string k_AnnotationType = "instance segmentation";
+
+        public InstanceSegmentationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
     }
 
     /// <summary>

@@ -53,7 +53,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
         Dictionary<int, AsyncMetric> m_ObjectInfoAsyncMetrics;
-        MetricDefinition m_RenderedObjectInfoMetricDefinition;
+//        MetricDefinition m_RenderedObjectInfoMetricDefinition;
 
         /// <summary>
         /// Creates a new RenderedObjectInfoLabeler. Be sure to assign <see cref="idLabelConfig"/> before adding to a <see cref="PerceptionCamera"/>.
@@ -92,6 +92,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
+#if false
             if (m_RenderedObjectInfoMetricDefinition.Equals(default))
             {
                 m_RenderedObjectInfoMetricDefinition = DatasetCapture.RegisterMetricDefinition(
@@ -102,6 +103,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             m_ObjectInfoAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_RenderedObjectInfoMetricDefinition);
+#endif
         }
 
         void ProduceRenderedObjectInfoMetric(NativeArray<RenderedObjectInfo> renderedObjectInfos, int frameCount)

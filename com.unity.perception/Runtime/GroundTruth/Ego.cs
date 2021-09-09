@@ -9,6 +9,7 @@ namespace UnityEngine.Perception.GroundTruth
     /// </summary>
     public class Ego : MonoBehaviour
     {
+#if false
         /// <summary>
         /// A human-readable description for this Ego to be included in the dataset.
         /// </summary>
@@ -40,5 +41,6 @@ namespace UnityEngine.Perception.GroundTruth
                 m_EgoHandle = DatasetCapture.RegisterEgo(Description);
 #endif
         }
+#endif
     }
 }

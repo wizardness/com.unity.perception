@@ -113,6 +113,11 @@ namespace GroundTruth.SoloDesign
         Dictionary<int, Guid> m_SequenceToGuidMap = new Dictionary<int, Guid>();
         List<PerceptionCapture> m_CurrentCaptures = new List<PerceptionCapture>();
 
+        void Start()
+        {
+            // Only here to get the check mark to show up in Unity Editor
+        }
+
         internal string VerifyDirectoryWithGuidExists(string directoryPrefix, bool appendGuid = true)
         {
             var dirs = Directory.GetDirectories(m_CurrentPath);

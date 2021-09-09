@@ -6,6 +6,7 @@ using Unity.Profiling;
 using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Perception.GroundTruth.SoloDesign;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 #if HDRP_PRESENT
@@ -47,7 +48,7 @@ namespace UnityEngine.Perception.GroundTruth
         int m_LastFrameCaptured = -1;
         int m_LastFrameEndRendering = -1;
         Ego m_EgoMarker;
-        SensorHandle m_SensorHandle;
+        SensorHandle _SensorHandle;
         Vector2 m_ScrollPosition;
 
 #if URP_PRESENT
@@ -55,6 +56,7 @@ namespace UnityEngine.Perception.GroundTruth
         bool m_IsGroundTruthRendererFeaturePresent;
         internal List<ScriptableRenderPass> passes = new List<ScriptableRenderPass>();
 #endif
+        public string ID;
 
         /// <summary>
         /// A human-readable description of the camera.
@@ -137,9 +139,9 @@ namespace UnityEngine.Perception.GroundTruth
             get
             {
                 EnsureSensorRegistered();
-                return m_SensorHandle;
+                return _SensorHandle;
             }
-            private set => m_SensorHandle = value;
+            private set => _SensorHandle = value;
         }
 
         /// <summary>
@@ -316,14 +318,17 @@ namespace UnityEngine.Perception.GroundTruth
 
         void EnsureSensorRegistered()
         {
-            if (m_SensorHandle.IsNil)
+            if (_SensorHandle.IsNil)
             {
-                m_EgoMarker = GetComponentInParent<Ego>();
-//                var ego = m_EgoMarker == null ? DatasetCapture.RegisterEgo("") : m_EgoMarker.EgoHandle;
-                var ego = new EgoHandle();
-                SensorHandle = DatasetCapture.Instance.RegisterSensor(
-                    ego, "camera", description, firstCaptureFrame, captureTriggerMode,
-                    simulationDeltaTime, framesBetweenCaptures, manualSensorAffectSimulationTiming);
+                var sensorDef = new SensorDefinition(ID, "camera", description)
+                {
+                    firstCaptureFrame = firstCaptureFrame,
+                    captureTriggerMode = captureTriggerMode.ToString(),
+                    simulationDeltaTime = simulationDeltaTime,
+                    framesBetweenCaptures = framesBetweenCaptures,
+                    manualSensorsAffectTiming = manualSensorAffectSimulationTiming
+                };
+                SensorHandle = DatasetCapture.Instance.RegisterSensor(sensorDef);
             }
         }
 

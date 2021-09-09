@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.SoloDesign;
 
 namespace GroundTruth.SoloDesign
@@ -30,7 +31,7 @@ namespace GroundTruth.SoloDesign
                 {
                     return JToken.FromObject(PerceptionInstanceSegmentationValue.Convert(consumer, frame.frame, i), consumer.Serializer);
                 }
-                case BoundingBoxAnnotation b:
+                case BoundingBox2DLabeler.BoundingBoxAnnotation b:
                 {
                     return JToken.FromObject(PerceptionBoundingBoxAnnotationValue.Convert(consumer, labelerId, defId, b), consumer.Serializer);
                 }
@@ -145,7 +146,7 @@ namespace GroundTruth.SoloDesign
             public float width;
             public float height;
 
-            internal static Entry Convert(BoundingBoxAnnotation.Entry entry)
+            internal static Entry Convert(BoundingBox2DLabeler.BoundingBoxAnnotation.Entry entry)
             {
                 return new Entry
                 {
@@ -165,7 +166,7 @@ namespace GroundTruth.SoloDesign
         public Guid annotation_definition;
         public List<Entry> values;
 
-        public static PerceptionBoundingBoxAnnotationValue Convert(OldPerceptionConsumer consumer, Guid labelerId, Guid defId, BoundingBoxAnnotation annotation)
+        public static PerceptionBoundingBoxAnnotationValue Convert(OldPerceptionConsumer consumer, Guid labelerId, Guid defId, BoundingBox2DLabeler.BoundingBoxAnnotation annotation)
         {
             return new PerceptionBoundingBoxAnnotationValue
             {

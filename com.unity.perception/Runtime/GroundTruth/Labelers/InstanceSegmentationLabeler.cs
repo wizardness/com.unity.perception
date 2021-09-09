@@ -5,9 +5,9 @@ using System.IO;
 using Unity.Collections;
 using Unity.Profiling;
 using Unity.Simulation;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Perception.GroundTruth.SoloDesign;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
@@ -19,6 +19,8 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class InstanceSegmentationLabeler : CameraLabeler, IOverlayPanelProvider
     {
+        InstanceSegmentationDefinition m_Definition = new InstanceSegmentationDefinition();
+
         ///<inheritdoc/>
         public override string description
         {
@@ -29,26 +31,21 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override bool supportsVisualization => true;
 
-        static readonly string k_Directory = "InstanceSegmentation" + Guid.NewGuid().ToString();
-        const string k_FilePrefix = "Instance_";
-
         /// <summary>
         /// The GUID to associate with annotations produced by this labeler.
         /// </summary>
         [Tooltip("The id to associate with instance segmentation annotations in the dataset.")]
-        public string annotationId = "1ccebeb4-5886-41ff-8fe0-f911fa8cbcdf";
+        public string annotationId = "instance segmentation";
 
         /// <summary>
         /// The <see cref="idLabelConfig"/> which associates objects with labels.
         /// </summary>
         public IdLabelConfig idLabelConfig;
 
-        AnnotationDefinition m_AnnotationDefinition;
-
         static ProfilerMarker s_OnObjectInfoReceivedCallback = new ProfilerMarker("OnInstanceSegmentationObjectInformationReceived");
         static ProfilerMarker s_OnImageReceivedCallback = new ProfilerMarker("OnInstanceSegmentationImagesReceived");
 
-        Dictionary<int, (AsyncAnnotation, byte[])> m_AsyncAnnotations;
+        Dictionary<int, (AsyncAnnotation annotation, byte[] buffer)> m_AsyncData;
         Texture m_CurrentTexture;
 
         /// <inheritdoc cref="IOverlayPanelProvider"/>
@@ -99,52 +96,56 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnRenderedObjectInfosCalculated(int frame, NativeArray<RenderedObjectInfo> renderedObjectInfos)
         {
-            if (!m_AsyncAnnotations.TryGetValue(frame, out var annotation))
+            if (!m_AsyncData.TryGetValue(frame, out var asyncData))
                 return;
 
-            m_AsyncAnnotations.Remove(frame);
+            m_AsyncData.Remove(frame);
 
             using (s_OnObjectInfoReceivedCallback.Auto())
             {
                 m_InstanceData.Clear();
 
-                var colorValues = new List<ColorValue>();
+                var instances = new List<InstanceSegmentation.Entry>();
 
                 foreach (var objectInfo in renderedObjectInfos)
                 {
                     if (!idLabelConfig.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
                         continue;
 
-                    colorValues.Add(new ColorValue
+                    instances.Add(new InstanceSegmentation.Entry
                     {
-                        instance_id = objectInfo.instanceId,
-                        color = objectInfo.instanceColor
+                        instanceId = (int)objectInfo.instanceId,
+                        rgba = objectInfo.instanceColor
                     });
                 }
 
-                var instanceData = new InstanceData
+                var toReport = new InstanceSegmentation
                 {
-                    buffer = annotation.Item2,
-                    colors = colorValues
+                    sensorId = perceptionCamera.ID,
+                    Id = m_Definition.id,
+                    annotationType = m_Definition.annotationType,
+                    description = m_Definition.description,
+                    imageFormat = "png",
+                    instances = instances,
+                    dimension = new Vector2(Screen.width, Screen.height), // TODO figure out how to get this from the camera
+                    buffer = asyncData.buffer
                 };
 
-                m_InstanceData.Add(instanceData);
-
-                annotation.Item1.ReportFileAndValues(m_InstancePath, m_InstanceData);
+                asyncData.annotation.Report(toReport);
             }
         }
 
         void OnImageCaptured(int frameCount, NativeArray<Color32> data, RenderTexture renderTexture)
         {
-            if (!m_AsyncAnnotations.TryGetValue(frameCount, out var annotation))
+            if (!m_AsyncData.TryGetValue(frameCount, out var annotation))
                 return;
 
             using (s_OnImageReceivedCallback.Auto())
             {
                 m_CurrentTexture = renderTexture;
 
-                m_InstancePath = $"{k_Directory}/{k_FilePrefix}{frameCount}.png";
-                var localPath = $"{Manager.Instance.GetDirectoryFor(k_Directory)}/{k_FilePrefix}{frameCount}.png";
+//                m_InstancePath = $"{k_Directory}/{k_FilePrefix}{frameCount}.png";
+//                var localPath = $"{Manager.Instance.GetDirectoryFor(k_Directory)}/{k_FilePrefix}{frameCount}.png";
 
                 var colors = new NativeArray<Color32>(data, Allocator.Persistent);
 #if false
@@ -173,21 +174,21 @@ namespace UnityEngine.Perception.GroundTruth
                 asyncRequest.Execute();
 #endif
                 annotation.Item2 = ImageConversion.EncodeArrayToPNG(colors.ToArray(), GraphicsFormat.R8G8B8A8_UNorm, (uint)renderTexture.width, (uint)renderTexture.height);
-                Profiler.EndSample();
-                Profiler.BeginSample("InstanceSegmentationWritePng");
-                File.WriteAllBytes(localPath, annotation.Item2);
-                Manager.Instance.ConsumerFileProduced(localPath);
-                Profiler.EndSample();
+//                Profiler.EndSample();
+//                Profiler.BeginSample("InstanceSegmentationWritePng");
+//                File.WriteAllBytes(localPath, annotation.Item2);
+//                Manager.Instance.ConsumerFileProduced(localPath);
+//                Profiler.EndSample();
                 colors.Dispose();
 
-                m_AsyncAnnotations[frameCount] = annotation;
+                m_AsyncData[frameCount] = annotation;
             }
         }
 
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
-            m_AsyncAnnotations[Time.frameCount] = (perceptionCamera.SensorHandle.ReportAnnotationAsync(m_AnnotationDefinition), null);
+            m_AsyncData[Time.frameCount] = (perceptionCamera.SensorHandle.ReportAnnotationAsync(m_Definition), null);
         }
 
         /// <inheritdoc/>
@@ -201,14 +202,7 @@ namespace UnityEngine.Perception.GroundTruth
             perceptionCamera.InstanceSegmentationImageReadback += OnImageCaptured;
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
 
-            m_AsyncAnnotations = new Dictionary<int, (AsyncAnnotation, byte[])>();
-
-            m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition(
-                "instance segmentation",
-                idLabelConfig.GetAnnotationSpecification(),
-                "pixel-wise instance segmentation label",
-                "PNG",
-                Guid.Parse(annotationId));
+            m_AsyncData = new Dictionary<int, (AsyncAnnotation, byte[])>();
 
             visualizationEnabled = supportsVisualization;
         }

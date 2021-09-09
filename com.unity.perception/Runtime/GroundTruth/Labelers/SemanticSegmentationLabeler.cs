@@ -93,7 +93,7 @@ namespace UnityEngine.Perception.GroundTruth
         [SerializeField]
         RenderTexture m_TargetTextureOverride;
 
-        AnnotationDefinition m_SemanticSegmentationAnnotationDefinition;
+//        AnnotationDefinition m_SemanticSegmentationAnnotationDefinition;
         RenderTextureReader<Color32> m_SemanticSegmentationTextureReader;
 
 #if HDRP_PRESENT
@@ -215,14 +215,16 @@ namespace UnityEngine.Perception.GroundTruth
                     pixel_value = labelConfig.skyColor
                 });
             }
-
+#if false
             m_SemanticSegmentationAnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition(
                 "semantic segmentation",
                 specs.ToArray(),
                 "pixel-wise semantic segmentation label",
                 "PNG",
                 id: Guid.Parse(annotationId));
-
+#else
+//            m_SemanticSegmentationAnnotationDefinition = new AnnotationDefinition();
+#endif
             m_SemanticSegmentationTextureReader = new RenderTextureReader<Color32>(targetTexture);
             visualizationEnabled = supportsVisualization;
         }
@@ -243,7 +245,7 @@ namespace UnityEngine.Perception.GroundTruth
             var datasetRelativePath = $"{semanticSegmentationDirectory}/{k_SegmentationFilePrefix}{frameCount}.png";
             var localPath = $"{Manager.Instance.GetDirectoryFor(semanticSegmentationDirectory)}/{k_SegmentationFilePrefix}{frameCount}.png";
 
-            annotation.ReportFileAndValues(datasetRelativePath, info);
+//            annotation.ReportFileAndValues(datasetRelativePath, info);
 
             var asyncRequest = Manager.Instance.CreateRequest<AsyncRequest<AsyncSemanticSegmentationWrite>>();
 
@@ -278,10 +280,11 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnEndRendering(ScriptableRenderContext scriptableRenderContext)
         {
+#if false
             m_AsyncAnnotations[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_SemanticSegmentationAnnotationDefinition);
             m_SemanticSegmentationTextureReader.Capture(scriptableRenderContext,
                 (frameCount, data, renderTexture) => OnSemanticSegmentationImageRead(frameCount, data));
-
+#endif
         }
 
         /// <inheritdoc/>

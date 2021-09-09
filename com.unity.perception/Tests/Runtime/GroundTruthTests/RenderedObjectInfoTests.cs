@@ -170,7 +170,7 @@ namespace GroundTruthTests
             boundingBoxes.Dispose();
             cache.Dispose();
         }
-
+#if false
 
         [UnityTest]
         public IEnumerator LabelsCorrectWhenIdsReset()
@@ -246,7 +246,7 @@ namespace GroundTruthTests
 
             Assert.AreEqual(3, timesInfoReceived);
         }
-
+#endif
         private GameObject SetupCameraBoundingBox2D(Action<BoundingBox2DLabeler.BoundingBoxesCalculatedEventArgs> onBoundingBoxesCalculated, IdLabelConfig idLabelConfig)
         {
             var cameraObject = SetupCamera(camera =>

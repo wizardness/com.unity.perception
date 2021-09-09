@@ -5,7 +5,6 @@ using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.Exporters;
-using UnityEngine.Perception.GroundTruth.Exporters.PerceptionFormat;
 
 namespace UnityEditor.Perception.GroundTruth
 {
@@ -14,14 +13,10 @@ namespace UnityEditor.Perception.GroundTruth
     {
         Dictionary<SerializedProperty, CameraLabelerDrawer> m_CameraLabelerDrawers = new Dictionary<SerializedProperty, CameraLabelerDrawer>();
         ReorderableList m_LabelersList;
-        string[] m_ExporterList;
 
         SerializedProperty labelersProperty => this.serializedObject.FindProperty("m_Labelers");
 
         PerceptionCamera perceptionCamera => ((PerceptionCamera)this.target);
-
-        string m_OutputMode = "Perception";
-        int m_OutputModeIndex = -1;
 
         public void OnEnable()
         {
@@ -34,13 +29,14 @@ namespace UnityEditor.Perception.GroundTruth
             m_LabelersList.drawElementCallback = DrawElement;
             m_LabelersList.onAddCallback += OnAdd;
             m_LabelersList.onRemoveCallback += OnRemove;
-
+#if false
             m_OutputMode = PlayerPrefs.GetString(SimulationState.outputFormatMode);
             m_ExporterList = TypeCache.GetTypesDerivedFrom<IDatasetExporter>().Select(exporter => exporter.Name).ToArray();
             if (m_ExporterList.Any())
                 m_OutputModeIndex = Array.IndexOf(m_ExporterList, m_OutputMode);
 
             m_OutputMode = PlayerPrefs.GetString(SimulationState.outputFormatMode, "Perception");
+#endif
         }
 
         float GetElementHeight(int index)
@@ -97,10 +93,11 @@ namespace UnityEditor.Perception.GroundTruth
         {
             using(new EditorGUI.DisabledScope(EditorApplication.isPlaying))
             {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.ID)), new GUIContent("ID", "Provide a unique sensor ID for the camera."));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.description)), new GUIContent("Description", "Provide a description for this camera (optional)."));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.showVisualizations)), new GUIContent("Show Labeler Visualizations", "Display realtime visualizations for labelers that are currently active on this camera."));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.captureRgbImages)),new GUIContent("Save Camera RGB Output to Disk", "For each captured frame, save an RGB image of the camera's output to disk."));
-
+#if false
                 if (m_ExporterList.Any())
                 {
                     if (m_OutputModeIndex < 0)
@@ -118,7 +115,7 @@ namespace UnityEditor.Perception.GroundTruth
                         PlayerPrefs.SetString(SimulationState.outputFormatMode, m_OutputMode);
                     }
                 }
-
+#endif
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.captureTriggerMode)),new GUIContent("Capture Trigger Mode", $"The method of triggering captures for this camera. In {nameof(CaptureTriggerMode.Scheduled)} mode, captures happen automatically based on a start frame and frame delta time. In {nameof(CaptureTriggerMode.Manual)} mode, captures should be triggered manually through calling the {nameof(perceptionCamera.RequestCapture)} method of {nameof(PerceptionCamera)}."));
 
                 GUILayout.Space(5);

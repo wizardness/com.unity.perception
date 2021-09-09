@@ -103,6 +103,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
+#if true
             if (m_ObjectCountMetricDefinition.Equals(default))
             {
                 m_ObjectCountMetricDefinition = DatasetCapture.RegisterMetricDefinition("object count",
@@ -111,6 +112,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             m_ObjectCountAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_ObjectCountMetricDefinition);
+#endif
         }
 
         NativeArray<uint> ComputeObjectCounts(NativeArray<RenderedObjectInfo> objectInfo)

@@ -26,15 +26,6 @@ namespace UnityEngine.Perception.GroundTruth
         {
             var egoReference = new JObject();
             egoReference["version"] = DatasetCapture.SchemaVersion;
-            egoReference["egos"] = new JArray(m_Egos.Select(e =>
-            {
-                var egoObj = new JObject();
-                egoObj["id"] = e.Id.ToString();
-                if (e.Description != null)
-                    egoObj["description"] = e.Description;
-
-                return egoObj;
-            }).ToArray());
 
             WriteJObjectToFile(egoReference, "egos.json");
 
@@ -44,7 +35,6 @@ namespace UnityEngine.Perception.GroundTruth
             {
                 var sensorReference = new JObject();
                 sensorReference["id"] = kvp.Key.Id.ToString();
-                sensorReference["ego_id"] = kvp.Value.egoHandle.Id.ToString();
                 sensorReference["modality"] = kvp.Value.modality;
                 if (kvp.Value.description != null)
                     sensorReference["description"] = kvp.Value.description;
@@ -112,6 +102,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         void WriteJObjectToFile(JObject jObject, string filename)
         {
+#if false
             m_JsonToStringSampler.Begin();
             var stringWriter = new StringWriter(new StringBuilder(256), CultureInfo.InvariantCulture);
             using (var jsonTextWriter = new JsonTextWriter(stringWriter))
@@ -130,10 +121,11 @@ namespace UnityEngine.Perception.GroundTruth
             File.WriteAllText(path, contents);
             Manager.Instance.ConsumerFileProduced(path);
             m_WriteToDiskSampler.End();
+#endif
         }
 
         int m_currentReportedSequence = 0;
-        Dictionary<Guid, int> m_SequenceMap = new Dictionary<Guid, int>();
+        Dictionary<int, int> m_SequenceMap = new Dictionary<int, int>();
 
         Sensor ToSensor(PendingCapture pendingCapture, SimulationState simulationState, int captureFileIndex)
         {
@@ -182,7 +174,7 @@ namespace UnityEngine.Perception.GroundTruth
             {
                 var pendingCapture = m_PendingCaptures[i];
                 if ((writeCapturesFromThisFrame || pendingCapture.FrameCount < frameCountNow) &&
-                    pendingCapture.Annotations.All(a => a.Item2.IsAssigned))
+                    pendingCapture.Annotations.All(a => a.Item2 != null))
                 {
                     pendingCapturesToWrite.Add(pendingCapture);
                     m_PendingCaptures.RemoveAt(i);
@@ -195,7 +187,7 @@ namespace UnityEngine.Perception.GroundTruth
                 m_SerializeCapturesSampler.End();
                 return;
             }
-
+#if false
             BoundingBoxAnnotation ToBoundingBox(Annotation annotation, AnnotationData data)
             {
                 var bbox = new BoundingBoxAnnotation
@@ -227,8 +219,9 @@ namespace UnityEngine.Perception.GroundTruth
 
                 return bbox;
             }
-
-            InstanceSegmentation ToInstanceSegmentation(Annotation annotation, AnnotationData data, params(string,object)[] sensorValues)
+#endif
+#if false
+            InstanceSegmentation ToInstanceSegmentation(AnnotationHandle annotation, AnnotationData data, params(string,object)[] sensorValues)
             {
                 var seg = new InstanceSegmentation
                 {
@@ -278,7 +271,8 @@ namespace UnityEngine.Perception.GroundTruth
 
                 return seg;
             }
-
+#endif
+#if true
             List<Sensor> ConvertToSensors(PendingCapture capture, SimulationState simulationState)
             {
                 var dim = new Vector2();
@@ -317,7 +311,8 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                 };
             }
-
+#endif
+#if true
             Frame ConvertToFrameData(PendingCapture capture, SimulationState simState, int captureFileIndex)
             {
                 if (!m_SequenceMap.TryGetValue(capture.SequenceId, out var seq))
@@ -330,6 +325,12 @@ namespace UnityEngine.Perception.GroundTruth
 
                 frame.sensors = ConvertToSensors(capture, simState);
 
+                foreach (var (handle, annotation) in capture.Annotations)
+                {
+                    frame.annotations.Add(annotation);
+                }
+
+#if false
                 foreach (var (annotation, data) in capture.Annotations)
                 {
                     SoloDesign.Annotation soloAnnotation = null;
@@ -337,10 +338,12 @@ namespace UnityEngine.Perception.GroundTruth
 
                     switch (data.AnnotationDefinition.Id.ToString())
                     {
+#if false
                         case "f9f22e05-443f-4602-a422-ebe4ea9b55cb":
                             soloAnnotation = ToBoundingBox(annotation, data);
                             supported = true;
                             break;
+#endif
                         case "1ccebeb4-5886-41ff-8fe0-f911fa8cbcdf":
                             soloAnnotation = ToInstanceSegmentation(annotation, data, capture.AdditionalSensorValues);
                             supported = true;
@@ -348,11 +351,12 @@ namespace UnityEngine.Perception.GroundTruth
                     }
 
                     if (supported) frame.annotations.Add(soloAnnotation);
-                }
 
+                }
+#endif
                 return frame;
             }
-
+#endif
             void Write(List<PendingCapture> pendingCaptures, SimulationState simulationState, int captureFileIndex)
             {
                 foreach (var pendingCapture in pendingCaptures)
@@ -405,7 +409,7 @@ namespace UnityEngine.Perception.GroundTruth
             m_SerializeCapturesSampler.End();
             m_CaptureFileIndex++;
         }
-
+#if false
         struct WritePendingMetricRequestData
         {
             public List<PendingMetric> PendingMetrics;
@@ -483,15 +487,18 @@ namespace UnityEngine.Perception.GroundTruth
         static JObject JObjectFromPendingMetric(PendingMetric metric)
         {
             var jObject = new JObject();
+#if false
             jObject["capture_id"] = metric.CaptureId == Guid.Empty ? new JRaw("null") : new JValue(metric.CaptureId.ToString());
-            jObject["annotation_id"] = metric.Annotation.IsNil ? new JRaw("null") : new JValue(metric.Annotation.Id.ToString());
+            jObject["annotation_id"] = metric.annotationHandle.IsNil ? new JRaw("null") : new JValue(metric.annotationHandle.Id.ToString());
             jObject["sequence_id"] = metric.SequenceId.ToString();
             jObject["step"] = metric.Step;
             jObject["metric_definition"] = metric.MetricDefinition.Id.ToString();
             jObject["values"] = metric.Values;
+#endif
             return jObject;
         }
-
+#endif
+#if false
         /// <summary>
         /// Creates the json representation of the given PendingCapture. Static because this should not depend on any SimulationState members,
         /// which may have changed since the capture was reported.
@@ -500,7 +507,6 @@ namespace UnityEngine.Perception.GroundTruth
         {
             var sensorJObject = new JObject();//new SensorCaptureJson
             sensorJObject["sensor_id"] = pendingCapture.SensorHandle.Id.ToString();
-            sensorJObject["ego_id"] = pendingCapture.SensorData.egoHandle.Id.ToString();
             sensorJObject["modality"] = pendingCapture.SensorData.modality;
             sensorJObject["translation"] = DatasetJsonUtility.ToJToken(pendingCapture.SensorSpatialData.SensorPose.position);
             sensorJObject["rotation"] = DatasetJsonUtility.ToJToken(pendingCapture.SensorSpatialData.SensorPose.rotation);
@@ -512,7 +518,6 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             var egoCaptureJson = new JObject();
-            egoCaptureJson["ego_id"] = pendingCapture.SensorData.egoHandle.Id.ToString();
             egoCaptureJson["translation"] = DatasetJsonUtility.ToJToken(pendingCapture.SensorSpatialData.EgoPose.position);
             egoCaptureJson["rotation"] = DatasetJsonUtility.ToJToken(pendingCapture.SensorSpatialData.EgoPose.rotation);
             egoCaptureJson["velocity"] = pendingCapture.SensorSpatialData.EgoVelocity.HasValue ? DatasetJsonUtility.ToJToken(pendingCapture.SensorSpatialData.EgoVelocity.Value) : null;
@@ -525,16 +530,15 @@ namespace UnityEngine.Perception.GroundTruth
             capture["timestamp"] = pendingCapture.Timestamp;
             capture["sensor"] = sensorJObject;
             capture["ego"] = egoCaptureJson;
-            capture["filename"] = pendingCapture.Path;
-            capture["format"] = GetFormatFromFilename(pendingCapture.Path);
 
             if (pendingCapture.Annotations.Any())
                 capture["annotations"] = new JArray(pendingCapture.Annotations.Select(JObjectFromAnnotation).ToArray());
 
             return capture;
         }
-
-        static JObject JObjectFromAnnotation((Annotation, AnnotationData) annotationInfo)
+#endif
+#if false
+        static JObject JObjectFromAnnotation((AnnotationHandle, AnnotationData) annotationInfo)
         {
             var annotationJObject = new JObject();
             annotationJObject["id"] = annotationInfo.Item1.Id.ToString();
@@ -547,7 +551,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             return annotationJObject;
         }
-
+#endif
         struct WritePendingCaptureRequestData
         {
             public List<PendingCapture> PendingCaptures;

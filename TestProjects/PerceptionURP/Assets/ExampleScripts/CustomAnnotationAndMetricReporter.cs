@@ -19,25 +19,28 @@ public class CustomAnnotationAndMetricReporter : MonoBehaviour
     public GameObject targetLight;
     public GameObject target;
 
-    MetricDefinition lightMetricDefinition;
-    AnnotationDefinition boundingBoxAnnotationDefinition;
+//    MetricDefinition lightMetricDefinition;
+//    BoundingBox2DLabeler.BoundingBoxAnnotationDefinition boundingBoxAnnotationDefinition;
     SensorHandle cameraSensorHandle;
 
     public void Start()
     {
+#if false
         //Metrics and annotations are registered up-front
         lightMetricDefinition = DatasetCapture.RegisterMetricDefinition(
             "Light position",
             "The world-space position of the light",
             Guid.Parse("1F6BFF46-F884-4CC5-A878-DB987278FE35"));
-        boundingBoxAnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition(
-            "Target bounding box",
-            "The position of the target in the camera's local space",
-            id: Guid.Parse("C0B4A22C-0420-4D9F-BAFC-954B8F7B35A7"));
+
+        boundingBoxAnnotationDefinition = new BoundingBox2DLabeler.BoundingBoxAnnotationDefinition("Target Bounding Box", "The position of the target in the camera's local space");
+
+        DatasetCapture.RegisterAnnotationDefinition(boundingBoxAnnotationDefinition);
+#endif
     }
 
     public void Update()
     {
+#if false
         //Report the light's position by manually creating the json array string.
         var lightPos = targetLight.transform.position;
         DatasetCapture.ReportMetric(lightMetricDefinition,
@@ -52,6 +55,7 @@ public class CustomAnnotationAndMetricReporter : MonoBehaviour
                 boundingBoxAnnotationDefinition,
                 new[] { targetPos });
         }
+#endif
     }
 }
 
