@@ -37,7 +37,6 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             {
                 var filePath = new Uri(Configuration.Instance.SimulationConfig.app_param_uri).LocalPath;
                 LoadConfigurationFromFile(filePath);
-                PlayerPrefs.SetString(SimulationState.outputFormatMode, constants.outputFormat);
             }
             else
             {
@@ -51,6 +50,10 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             base.DeserializeConfiguration();
             if (Configuration.Instance.IsSimulationRunningInCloud())
                 constants.instanceIndex = int.Parse(Configuration.Instance.GetInstanceId()) - 1;
+
+            if (constants.outputFormat != string.Empty)
+                PlayerPrefs.SetString(SimulationState.outputFormatMode, constants.outputFormat);
+
             currentIteration = constants.instanceIndex;
         }
 

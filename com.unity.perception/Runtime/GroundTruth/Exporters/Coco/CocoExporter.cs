@@ -442,77 +442,90 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.Coco
             var boxJson = string.Empty;
             var keypointJson = string.Empty;
 
-            foreach (var cap in pendingCaptures)
+            try
             {
-                var boxes = new Dictionary<int, CocoTypes.ObjectDetectionAnnotation>();
-
-                foreach (var annotation in cap.Annotations)
+                foreach (var cap in pendingCaptures)
                 {
-                    var tmp = ProcessBoundingBoxAnnotations(annotation.Item2.RawValues);
+                    var boxes = new Dictionary<int, CocoTypes.ObjectDetectionAnnotation>();
 
-                    foreach (var box in tmp.Values)
+                    foreach (var annotation in cap.Annotations)
                     {
-                        boxes[box.id] = box;
+                        if (annotation.Item2.RawValues == null)
+                            continue;
 
-                        if (m_FirstBoxAnnotation)
+                        var tmp = ProcessBoundingBoxAnnotations(annotation.Item2.RawValues);
+
+                        foreach (var box in tmp.Values)
                         {
-                            boxJson = "[";
-                            m_FirstBoxAnnotation = false;
-                        }
-                        else
-                            boxJson += ",";
+                            boxes[box.id] = box;
 
-                        boxJson += JsonUtility.ToJson(box);
+                            if (m_FirstBoxAnnotation)
+                            {
+                                boxJson = "[";
+                                m_FirstBoxAnnotation = false;
+                            }
+                            else
+                                boxJson += ",";
+
+                            boxJson += JsonUtility.ToJson(box);
+                        }
+
                     }
 
-                }
-
-                foreach (var annotation in cap.Annotations)
-                {
-                    var keypoints = ProcessKeypointAnnotations(annotation.Item2.RawValues, boxes);
-
-                    foreach (var kp in keypoints.Values)
+                    foreach (var annotation in cap.Annotations)
                     {
-                        if (m_FirstKeypointAnnotation)
+                        if (annotation.Item2.RawValues == null)
+                            continue;
+
+                        var keypoints = ProcessKeypointAnnotations(annotation.Item2.RawValues, boxes);
+
+                        foreach (var kp in keypoints.Values)
                         {
-                            keypointJson = "[";
-                            m_FirstKeypointAnnotation = false;
+                            if (m_FirstKeypointAnnotation)
+                            {
+                                keypointJson = "[";
+                                m_FirstKeypointAnnotation = false;
+                            }
+                            else
+                                keypointJson += ",";
+
+                            var builder = new StringBuilder();
+                            var stringWriter = new StringWriter(builder);
+
+                            var serializer = new JsonSerializer();
+
+                            using (var writer = new JsonTextWriter(stringWriter))
+                            {
+                                serializer.Serialize(writer, kp);
+                            }
+
+                            keypointJson += builder.ToString();
+
                         }
-                        else
-                            keypointJson += ",";
-
-                        var builder = new StringBuilder();
-                        var stringWriter = new StringWriter(builder);
-
-                        var serializer = new JsonSerializer();
-
-                        using (var writer = new JsonTextWriter(stringWriter))
-                        {
-                            serializer.Serialize(writer, kp);
-                        }
-
-                        keypointJson += builder.ToString();
-
                     }
                 }
+
+                if (m_ObjectDetectionWritingTask != null)
+                    await m_ObjectDetectionWritingTask;
+
+                if (boxJson != string.Empty)
+                {
+                    InitializeCaptureFiles();
+                    m_ObjectDetectionWritingTask = m_ObjectDetectionStream.WriteAsync(boxJson);
+                }
+
+                if (m_KeypointDetectionWritingTask != null)
+                    await m_KeypointDetectionWritingTask;
+
+                if (keypointJson != string.Empty)
+                {
+                    InitializeCaptureFiles();
+                    m_KeypointDetectionWritingTask = m_KeypointDetectionStream.WriteAsync(keypointJson);
+                }
             }
-
-            if (m_ObjectDetectionWritingTask != null)
-                await m_ObjectDetectionWritingTask;
-
-            if (boxJson != string.Empty)
+            catch (Exception e)
             {
-                InitializeCaptureFiles();
-                m_ObjectDetectionWritingTask = m_ObjectDetectionStream.WriteAsync(boxJson);
-            }
-
-            if (m_KeypointDetectionWritingTask != null)
-                await m_KeypointDetectionWritingTask;
-
-            if (keypointJson != string.Empty)
-            {
-                InitializeCaptureFiles();
-                m_KeypointDetectionWritingTask = m_KeypointDetectionStream.WriteAsync(keypointJson);
+                Debug.LogException(e);
             }
         }
 
