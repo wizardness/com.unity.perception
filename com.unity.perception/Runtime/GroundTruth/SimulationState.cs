@@ -844,17 +844,7 @@ namespace UnityEngine.Perception.GroundTruth
                 }
             }
 
-            List<object> values2 = null;
-            if (values != null)
-            {
-                values2 = new List<object>();
-                foreach (var v in values)
-                {
-                    values2.Add(v);
-                }
-            }
-
-            ReportAsyncAnnotationResult(asyncAnnotation, filename, jArray, values:values2);
+            ReportAsyncAnnotationResult(asyncAnnotation, filename, jArray, values?.Cast<object>().ToList() ?? null);
         }
 
         void ReportAsyncAnnotationResult(AsyncAnnotation asyncAnnotation, string filename, JArray jArray, IEnumerable<object> values = null)
