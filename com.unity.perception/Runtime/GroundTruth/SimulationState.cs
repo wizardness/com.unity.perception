@@ -287,7 +287,20 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                     case FutureType.Metric:
                     {
-                        return asyncFuture.GetId() is SPendingCaptureId captureId && Annotations.ContainsKey(captureId) && Metrics[captureId] == null;
+#if true
+                        if (!(asyncFuture.GetId() is SPendingCaptureId captureId))
+                        {
+                            return false;
+                        }
+
+                        var b = Metrics.ContainsKey(captureId);
+                        if (!b) return false;
+
+                        var c = Metrics[captureId];
+                        return c == null;
+#else
+                        return asyncFuture.GetId() is SPendingCaptureId captureId && Metrics.ContainsKey(captureId) && Metrics[captureId] == null;
+#endif
                     }
                     default:
                         throw new ArgumentOutOfRangeException();
