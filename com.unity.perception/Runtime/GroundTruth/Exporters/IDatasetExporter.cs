@@ -13,7 +13,7 @@ namespace UnityEngine.Perception.GroundTruth.Exporters
 
         void OnAnnotationRegistered<TSpec>(Guid annotationId, TSpec[] values);
 
-        Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState);
+        Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState, int captureFileIndex);
 
         Task OnCaptureReported(int frame, int width, int height, string filename);
     }

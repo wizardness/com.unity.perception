@@ -437,7 +437,7 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.Coco
             };
         }
 
-        public async Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState)
+        public async Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState, int captureFileIndex)
         {
             var boxJson = string.Empty;
             var keypointJson = string.Empty;

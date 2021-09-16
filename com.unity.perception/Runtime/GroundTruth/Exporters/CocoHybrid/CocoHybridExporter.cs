@@ -34,10 +34,10 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.CocoHybrid
             m_Perception.OnAnnotationRegistered(annotationId, values);
         }
 
-        public async Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState)
+        public async Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState, int captureFileIndex)
         {
-            var cocoTask = m_Coco.ProcessPendingCaptures(pendingCaptures, simState);
-            var perceptionTask = m_Perception.ProcessPendingCaptures(pendingCaptures, simState);
+            var cocoTask = m_Coco.ProcessPendingCaptures(pendingCaptures, simState, captureFileIndex);
+            var perceptionTask = m_Perception.ProcessPendingCaptures(pendingCaptures, simState, captureFileIndex);
             await cocoTask;
             await perceptionTask;
         }
