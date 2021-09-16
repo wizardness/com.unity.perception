@@ -4,10 +4,11 @@ using System.IO;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine.Perception.GroundTruth.DataModel;
 
-namespace UnityEngine.Perception.GroundTruth.SoloDesign
+namespace UnityEngine.Perception.GroundTruth.Consumers
 {
-    public class SoloConsumer : PerceptionConsumer
+    public class SoloConsumer : ConsumerEndpoint
     {
         public string _baseDirectory = "D:/PerceptionOutput/SoloConsumer";
         public string soloDatasetName = "solo";
@@ -94,8 +95,7 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             };
 
             var captures = new JArray();
-            var annotations = new JArray();
-            var metrics = new JArray();
+
 
             foreach (var sensor in frame.sensors)
             {
@@ -107,22 +107,10 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
                 }
             }
 
-            foreach (var annotation in frame.annotations)
-            {
-                switch (annotation)
-                {
-                    case BoundingBox2DLabeler.BoundingBoxAnnotation bbox:
-                        annotations.Add(ConvertAnnotation(frame, bbox));
-                        break;
-                    case InstanceSegmentation seg:
-                        annotations.Add(ConvertAnnotation(frame, seg));
-                        break;
-                }
-            }
+
 
             frameJson["captures"] = captures;
-            frameJson["annotations"] = annotations;
-            frameJson["metrics"] = metrics;
+
 
             return frameJson;
         }
@@ -180,12 +168,42 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             outRgb["fileName"] = path;
             outRgb["imageFormat"] = sensor.imageFormat;
             outRgb["dimension"] = FromVector2(sensor.dimension);
+
+            var annotations = new JArray();
+            var metrics = new JArray();
+
+            foreach (var annotation in sensor.annotations)
+            {
+                switch (annotation)
+                {
+                    case BoundingBox2DLabeler.BoundingBoxAnnotation bbox:
+                        annotations.Add(ConvertAnnotation(frame, bbox));
+                        break;
+                    case InstanceSegmentationLabeler.InstanceSegmentation seg:
+                        annotations.Add(ConvertAnnotation(frame, seg));
+                        break;
+                }
+            }
+
+            foreach (var metric in sensor.metrics)
+            {
+                switch (metric)
+                {
+                    case ObjectCountLabeler.ObjectCountMetric objCount:
+                        metrics.Add(ConvertMetric(frame, objCount));
+                        break;
+                }
+            }
+
+            outRgb["annotations"] = annotations;
+            outRgb["metrics"] = metrics;
+
             return outRgb;
         }
 
         static JToken ToAnnotationHeader(Frame frame, Annotation annotation)
         {
-            var token = new JObject
+            return new JObject
             {
                 ["Id"] = annotation.Id,
                 ["definition"] = annotation.description,
@@ -193,7 +211,16 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
                 ["step"] = frame.step,
                 ["sensor"] = annotation.sensorId
             };
-            return token;
+        }
+
+        static JToken ToMetricHeader(Frame frame, Metric metric)
+        {
+            return new JObject
+            {
+                ["sensorId"] = metric.sensorId,
+                ["annotationId"] = metric.annotationId,
+                ["description"] = metric.description
+            };
         }
 
         static JToken ConvertAnnotation(Frame frame, BoundingBox2DLabeler.BoundingBoxAnnotation bbox)
@@ -218,7 +245,25 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             return outBox;
         }
 
-        static JToken ConvertAnnotation(Frame frame, InstanceSegmentation segmentation)
+        static JToken ConvertMetric(Frame frame, ObjectCountLabeler.ObjectCountMetric count)
+        {
+            var outCount = ToMetricHeader(frame, count);
+            var values = new JArray();
+
+            foreach (var i in count.objectCounts)
+            {
+                values.Add(new JObject
+                {
+                    ["label_name"] = i.labelName,
+                    ["count"] = i.count
+                });
+            }
+
+            outCount["object_counts"] = values;
+            return outCount;
+        }
+
+        static JToken ConvertAnnotation(Frame frame, InstanceSegmentationLabeler.InstanceSegmentation segmentation)
         {
             // write out the png data
             var path = GetSequenceDirectoryPath(frame);
@@ -244,8 +289,6 @@ namespace UnityEngine.Perception.GroundTruth.SoloDesign
             outSeg["dimension"] = FromVector2(segmentation.dimension);
             outSeg["imagePath"] = path;
             outSeg["instances"] = values;
-
-
 
             return outSeg;
         }

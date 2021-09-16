@@ -37,7 +37,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             {
                 var filePath = new Uri(Configuration.Instance.SimulationConfig.app_param_uri).LocalPath;
                 LoadConfigurationFromFile(filePath);
-                PlayerPrefs.SetString(SimulationState.outputFormatMode, constants.outputFormat);
+//                PlayerPrefs.SetString(SimulationState.outputFormatMode, constants.outputFormat);
             }
             else
             {

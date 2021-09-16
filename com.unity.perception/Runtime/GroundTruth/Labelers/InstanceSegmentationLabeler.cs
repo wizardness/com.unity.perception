@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using Unity.Collections;
 using Unity.Profiling;
-using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
-using UnityEngine.Profiling;
+using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.GroundTruth
@@ -19,6 +17,70 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class InstanceSegmentationLabeler : CameraLabeler, IOverlayPanelProvider
     {
+        [Serializable]
+        public class InstanceSegmentationDefinition : AnnotationDefinition
+        {
+            static readonly string k_Id = "instance segmentation";
+            static readonly string k_Description = "You know the deal";
+            static readonly string k_AnnotationType = "instance segmentation";
+
+            public InstanceSegmentationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
+        }
+
+        /// <summary>
+        /// The instance segmentation image recorded for a capture. This
+        /// includes the data that associates a pixel color to an object.
+        /// </summary>
+        [Serializable]
+        public class InstanceSegmentation : Annotation
+        {
+            public struct Entry
+            {
+                /// <summary>
+                /// The instance ID associated with a pixel color
+                /// </summary>
+                public int instanceId;
+                /// <summary>
+                /// The color (rgba) value
+                /// </summary>
+                public Color32 rgba;
+
+                internal void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("instance_id", instanceId);
+                    builder.AddIntVector("rgba", new[] { (int)rgba.r, (int)rgba.g, (int)rgba.b, (int)rgba.a });
+                }
+            }
+
+            /// <summary>
+            /// This instance to pixel map
+            /// </summary>
+            public List<Entry> instances;
+
+            // The format of the image type
+            public string imageFormat;
+
+            // The dimensions (width, height) of the image
+            public Vector2 dimension;
+
+            // The raw bytes of the image file
+            public byte[] buffer;
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                builder.AddString("image_format", imageFormat);
+                builder.AddFloatVector("dimension", new[] { dimension.x, dimension.y });
+                builder.AddPngImage("instance_segmentation", buffer);
+
+                foreach (var e in instances)
+                {
+                    var nested = builder.AddNestedMessageToVector("instances");
+                    e.ToMessage(nested);
+                }
+            }
+        }
+
         InstanceSegmentationDefinition m_Definition = new InstanceSegmentationDefinition();
 
         ///<inheritdoc/>
@@ -45,7 +107,7 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_OnObjectInfoReceivedCallback = new ProfilerMarker("OnInstanceSegmentationObjectInformationReceived");
         static ProfilerMarker s_OnImageReceivedCallback = new ProfilerMarker("OnInstanceSegmentationImagesReceived");
 
-        Dictionary<int, (AsyncAnnotation annotation, byte[] buffer)> m_AsyncData;
+        Dictionary<int, (AsyncAnnotationFuture future, byte[] buffer)> m_AsyncData;
         Texture m_CurrentTexture;
 
         /// <inheritdoc cref="IOverlayPanelProvider"/>
@@ -131,7 +193,7 @@ namespace UnityEngine.Perception.GroundTruth
                     buffer = asyncData.buffer
                 };
 
-                asyncData.annotation.Report(toReport);
+                asyncData.future.Report(toReport);
             }
         }
 
@@ -202,7 +264,7 @@ namespace UnityEngine.Perception.GroundTruth
             perceptionCamera.InstanceSegmentationImageReadback += OnImageCaptured;
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
 
-            m_AsyncData = new Dictionary<int, (AsyncAnnotation, byte[])>();
+            m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture, byte[])>();
 
             visualizationEnabled = supportsVisualization;
         }

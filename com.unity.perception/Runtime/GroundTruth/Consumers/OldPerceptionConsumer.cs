@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using UnityEngine;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using Formatting = Newtonsoft.Json.Formatting;
 
-namespace GroundTruth.SoloDesign
+namespace UnityEngine.Perception.GroundTruth.Consumers
 {
     public class PerceptionResolver : DefaultContractResolver
     {
@@ -84,7 +85,7 @@ namespace GroundTruth.SoloDesign
         }
     }
 
-    public class OldPerceptionConsumer : PerceptionConsumer
+    public class OldPerceptionConsumer : ConsumerEndpoint
     {
         static readonly string version = "0.1.1";
 
@@ -195,16 +196,16 @@ namespace GroundTruth.SoloDesign
             var path = "";
 
             RgbSensor rgbSensor = null;
-            if (frame.sensors.Count == 1)
+            if (frame.sensors.Count() == 1)
             {
-                var sensor = frame.sensors[0];
+                var sensor = frame.sensors.First();
                 if (sensor is RgbSensor rgb)
                 {
                     rgbSensor = rgb;
                     path = WriteOutImageFile(frame.frame, rgb);
                 }
             }
-
+#if false // TODO bring back annotations....
             var annotations = new JArray();
             foreach (var annotation in frame.annotations)
             {
@@ -219,7 +220,7 @@ namespace GroundTruth.SoloDesign
                 var json = OldPerceptionJsonFactory.Convert(this, frame, labelerId, defId, annotation);
                 if (json != null) annotations.Add(json);
             }
-
+#endif
             var capture = new PerceptionCapture
             {
                 id = Guid.NewGuid(),
@@ -229,7 +230,7 @@ namespace GroundTruth.SoloDesign
                 step = frame.step,
                 timestamp = frame.timestamp,
                 sensor = PerceptionRgbSensor.Convert(this, rgbSensor, path),
-                annotations = annotations
+//                annotations = annotations
             };
 
             m_CurrentCaptures.Add(capture);

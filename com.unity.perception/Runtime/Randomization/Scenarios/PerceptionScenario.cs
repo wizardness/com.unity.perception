@@ -1,6 +1,7 @@
 ﻿using System;
 using Unity.Simulation;
 using UnityEngine.Perception.GroundTruth;
+using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.Randomization.Scenarios
 {
@@ -43,8 +44,8 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// <inheritdoc/>
         protected override void OnStart()
         {
-            var md = new GroundTruth.SoloDesign.MetricDefinition();
-            DatasetCapture.Instance.RegisterMetricDefinition(md);
+            var md = new MetricDefinition();
+            DatasetCapture.Instance.RegisterMetric(md);
 
 #if false
             m_IterationMetricDefinition = DatasetCapture.Instance.RegisterMetricDefinition(

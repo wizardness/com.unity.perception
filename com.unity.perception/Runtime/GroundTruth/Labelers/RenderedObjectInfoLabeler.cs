@@ -52,7 +52,7 @@ namespace UnityEngine.Perception.GroundTruth
         public IdLabelConfig idLabelConfig;
 
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
-        Dictionary<int, AsyncMetric> m_ObjectInfoAsyncMetrics;
+        Dictionary<int, AsyncMetricFuture> m_ObjectInfoAsyncMetrics;
 //        MetricDefinition m_RenderedObjectInfoMetricDefinition;
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("RenderedObjectInfoLabeler's idLabelConfig field must be assigned");
 
-            m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetric>();
+            m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetricFuture>();
 
             perceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
@@ -147,7 +147,7 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                 }
 
-                metric.ReportValues(m_VisiblePixelsValues);
+//                metric.Report(m_VisiblePixelsValues);
             }
         }
 

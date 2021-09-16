@@ -167,7 +167,7 @@ namespace UnityEditor.Perception.GroundTruth
             s.wordWrap = true;
             var defaultColor = s.normal.textColor;
 
-            var dir = PlayerPrefs.GetString(SimulationState.latestOutputDirectoryKey, string.Empty);
+            var dir = PlayerPrefs.GetString(string.Empty, string.Empty);
             if (dir != string.Empty)
             {
                 EditorGUILayout.LabelField("Latest Generated Dataset");
@@ -192,10 +192,10 @@ namespace UnityEditor.Perception.GroundTruth
 
             GUILayout.Space(10);
 
-            var userBaseDir = PlayerPrefs.GetString(SimulationState.userBaseDirectoryKey);
+            var userBaseDir = PlayerPrefs.GetString(string.Empty, string.Empty);
             if (userBaseDir == string.Empty)
             {
-                var folder = PlayerPrefs.GetString(SimulationState.defaultOutputBaseDirectory);
+                var folder = PlayerPrefs.GetString(string.Empty, string.Empty);
                 userBaseDir = folder != string.Empty ? folder : Application.persistentDataPath;
             }
 
@@ -213,7 +213,7 @@ namespace UnityEditor.Perception.GroundTruth
                 if (path.Length != 0)
                 {
                     Debug.Log($"Chose path: {path}");
-                    PlayerPrefs.SetString(SimulationState.userBaseDirectoryKey, path);
+//                    PlayerPrefs.SetString(SimulationState.userBaseDirectoryKey, path);
                 }
             }
 

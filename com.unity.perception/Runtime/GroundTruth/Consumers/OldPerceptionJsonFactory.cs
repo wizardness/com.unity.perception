@@ -5,10 +5,9 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
-using UnityEngine.Perception.GroundTruth;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
+using UnityEngine.Perception.GroundTruth.DataModel;
 
-namespace GroundTruth.SoloDesign
+namespace UnityEngine.Perception.GroundTruth.Consumers
 {
     public static class OldPerceptionJsonFactory
     {
@@ -16,7 +15,7 @@ namespace GroundTruth.SoloDesign
         {
             switch (def)
             {
-                case BoundingBoxAnnotationDefinition b:
+                case BoundingBox2DLabeler.BoundingBoxAnnotationDefinition b:
                     return JToken.FromObject(PerceptionBoundingBoxAnnotationDefinition.Convert(id, b));
             }
 
@@ -27,7 +26,7 @@ namespace GroundTruth.SoloDesign
         {
             switch (annotation)
             {
-                case InstanceSegmentation i:
+                case InstanceSegmentationLabeler.InstanceSegmentation i:
                 {
                     return JToken.FromObject(PerceptionInstanceSegmentationValue.Convert(consumer, frame.frame, i), consumer.Serializer);
                 }
@@ -51,7 +50,7 @@ namespace GroundTruth.SoloDesign
             public int instance_id;
             public Color32 color;
 
-            internal static Entry Convert(InstanceSegmentation.Entry entry)
+            internal static Entry Convert(InstanceSegmentationLabeler.InstanceSegmentation.Entry entry)
             {
                 return new Entry
                 {
@@ -66,7 +65,7 @@ namespace GroundTruth.SoloDesign
         public string filename;
         public List<Entry> values;
 
-        static string CreateFile(OldPerceptionConsumer consumer, int frame, InstanceSegmentation annotation)
+        static string CreateFile(OldPerceptionConsumer consumer, int frame, InstanceSegmentationLabeler.InstanceSegmentation annotation)
         {
             var path = consumer.VerifyDirectoryWithGuidExists("InstanceSegmentation");
             path = Path.Combine(path, $"Instance_{frame}.png");
@@ -76,7 +75,7 @@ namespace GroundTruth.SoloDesign
             return path;
         }
 
-        public static PerceptionInstanceSegmentationValue Convert(OldPerceptionConsumer consumer, int frame, InstanceSegmentation annotation)
+        public static PerceptionInstanceSegmentationValue Convert(OldPerceptionConsumer consumer, int frame, InstanceSegmentationLabeler.InstanceSegmentation annotation)
         {
             return new PerceptionInstanceSegmentationValue
             {
@@ -104,7 +103,7 @@ namespace GroundTruth.SoloDesign
         public string format;
         public LabelDefinitionEntry[] spec;
 
-        public static PerceptionBoundingBoxAnnotationDefinition Convert(Guid inId, BoundingBoxAnnotationDefinition box)
+        public static PerceptionBoundingBoxAnnotationDefinition Convert(Guid inId, BoundingBox2DLabeler.BoundingBoxAnnotationDefinition box)
         {
             var specs = new LabelDefinitionEntry[box.spec.Count()];
             var i = 0;

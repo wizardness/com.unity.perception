@@ -6,7 +6,7 @@ using Unity.Profiling;
 using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 #if HDRP_PRESENT
@@ -316,11 +316,13 @@ namespace UnityEngine.Perception.GroundTruth
             SensorHandle = default;
         }
 
+        SensorDefinition m_SensorDefinition;
+
         void EnsureSensorRegistered()
         {
             if (_SensorHandle.IsNil)
             {
-                var sensorDef = new SensorDefinition(ID, "camera", description)
+                m_SensorDefinition = new SensorDefinition(ID, "camera", description)
                 {
                     firstCaptureFrame = firstCaptureFrame,
                     captureTriggerMode = captureTriggerMode.ToString(),
@@ -328,7 +330,7 @@ namespace UnityEngine.Perception.GroundTruth
                     framesBetweenCaptures = framesBetweenCaptures,
                     manualSensorsAffectTiming = manualSensorAffectSimulationTiming
                 };
-                SensorHandle = DatasetCapture.Instance.RegisterSensor(sensorDef);
+                SensorHandle = DatasetCapture.Instance.RegisterSensor(m_SensorDefinition);
             }
         }
 
@@ -431,36 +433,43 @@ namespace UnityEngine.Perception.GroundTruth
 
         void CaptureRgbData(Camera cam)
         {
-            // TODO - Steve - this could be a place where we override the capture of the RGB image to allow the
-            // active reporter to determine where we should save RGB images, or even write them out
-
             if (!captureRgbImages)
                 return;
 
             Profiler.BeginSample("CaptureDataFromLastFrame");
 
-            var width = cam.pixelWidth;
-            var height = cam.pixelHeight;
+            var capture = new RgbSensor
+            {
+                Id = "perception_camera",
+                sensorType = "rgb_camera",
+                description = "you know",
+                position = transform.position,
+                rotation = transform.eulerAngles,
+                velocity = Vector3.zero,
+                acceleration = Vector3.zero,
+                imageFormat = ".png",
+                dimension = new Vector2(cam.pixelWidth, cam.pixelHeight),
+                buffer = null
+            };
+
+
+            //var width = cam.pixelWidth;
+            //var height = cam.pixelHeight;
 
             var frameCount = Time.frameCount;
-            var captureFilename = $"{Manager.Instance.GetDirectoryFor(rgbDirectory)}/{k_RgbFilePrefix}{frameCount}.png";
+            //var captureFilename = $"{Manager.Instance.GetDirectoryFor(rgbDirectory)}/{k_RgbFilePrefix}{frameCount}.png";
 
             // Record the camera's projection matrix
             SetPersistentSensorData("camera_intrinsic", ToProjectionMatrix3x3(cam.projectionMatrix));
-            SetPersistentSensorData("camera_width", width);
-            SetPersistentSensorData("camera_height", height);
-            SetPersistentSensorData("full_path", captureFilename);
-            SetPersistentSensorData("frame", frameCount);
-
-            // Record the camera's projection type (orthographic or perspective)
             SetPersistentSensorData("projection", cam.orthographic ? "orthographic" : "perspective");
 
-            var dxRootPath = $"{rgbDirectory}/{k_RgbFilePrefix}{Time.frameCount}.png";
+            var asyncSensor = SensorHandle.ReportSensorAsync(m_SensorDefinition);
 
+#if false
             SensorHandle.ReportCapture(dxRootPath, SensorSpatialData.FromGameObjects(
                 m_EgoMarker == null ? null : m_EgoMarker.gameObject, gameObject),
                 m_PersistentSensorData.Select(kvp => (kvp.Key, kvp.Value)).ToArray());
-
+#endif
             Func<AsyncRequest<CaptureCamera.CaptureState>, AsyncRequest.Result> colorFunctor;
 
             colorFunctor = r =>
@@ -473,14 +482,19 @@ namespace UnityEngine.Perception.GroundTruth
                     using (s_EncodeAndSave.Auto())
                     {
                         encodedData = ImageConversion.EncodeArrayToPNG(
-                            dataColorBuffer, GraphicsFormat.R8G8B8A8_UNorm, (uint)width, (uint)height);
+                            dataColorBuffer, GraphicsFormat.R8G8B8A8_UNorm, (uint)capture.dimension.x, (uint)capture.dimension.y);
                     }
-
+#if false
                     SetPersistentSensorData("buffer", encodedData);
 
                     return !FileProducer.Write(captureFilename, encodedData)
                         ? AsyncRequest.Result.Error
                         : AsyncRequest.Result.Completed;
+#endif
+                    capture.buffer = encodedData;
+                    asyncSensor.Report(capture);
+
+                    return AsyncRequest.Result.Completed;
                 }
             };
 

@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace UnityEngine.Perception.GroundTruth.Exporters.Solo
+﻿namespace UnityEngine.Perception.GroundTruth.Exporters.Solo
 {
     public interface IMessageBuilder
     {

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Unity.Collections;
 using Unity.Profiling;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Rendering;
-using UnityEngine.UI;
 
 namespace UnityEngine.Perception.GroundTruth
 {
@@ -14,17 +14,40 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class ObjectCountLabeler : CameraLabeler
     {
+        /// <summary>
+        /// The object count metric records how many of a particular object are
+        /// present in a capture.
+        /// </summary>
+        [Serializable]
+        public class ObjectCountMetric : Metric
+        {
+            public struct Entry
+            {
+                /// <summary>
+                /// The label of the category
+                /// </summary>
+                public string labelName;
+                /// <summary>
+                /// The number of instances for a particular category.
+                /// </summary>
+                public int count;
+            }
+
+            /// <summary>
+            ///  The object counts
+            /// </summary>
+            public IEnumerable<Entry> objectCounts;
+        }
+
+        static readonly string k_Id = "ObjectCount";
+        static readonly string k_Description = "Produces object counts for each label defined in this labeler's associated label configuration.";
+
         ///<inheritdoc/>
         public override string description
         {
-            get => "Produces object counts for each label defined in this labeler's associated label configuration.";
+            get => k_Description;
             protected set {}
         }
-
-        /// <summary>
-        /// The ID to use for object count annotations in the resulting dataset
-        /// </summary>
-        public string objectCountMetricId = "51da3c27-369d-4929-aea6-d01614635ce2";
 
         /// <summary>
         /// The <see cref="IdLabelConfig"/> which associates objects with labels.
@@ -45,10 +68,10 @@ namespace UnityEngine.Perception.GroundTruth
 
         static ProfilerMarker s_ClassCountCallback = new ProfilerMarker("OnClassLabelsReceived");
 
-        ClassCountValue[] m_ClassCountValues;
+        ObjectCountMetric.Entry[] m_ClassCountValues;
 
-        Dictionary<int, AsyncMetric> m_ObjectCountAsyncMetrics;
-        MetricDefinition m_ObjectCountMetricDefinition;
+        Dictionary<int, AsyncMetricFuture> m_AsyncMetrics;
+        MetricDefinition m_Definition = new MetricDefinition(k_Id, k_Description);
 
         /// <summary>
         /// Creates a new ObjectCountLabeler. This constructor should only be used by serialization. For creation from
@@ -70,15 +93,6 @@ namespace UnityEngine.Perception.GroundTruth
             m_LabelConfig = labelConfig;
         }
 
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
-        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
-        struct ClassCountValue
-        {
-            public int label_id;
-            public string label_name;
-            public uint count;
-        }
-
         /// <inheritdoc/>
         protected override bool supportsVisualization => true;
 
@@ -88,15 +102,22 @@ namespace UnityEngine.Perception.GroundTruth
             if (labelConfig == null)
                 throw new InvalidOperationException("The ObjectCountLabeler idLabelConfig field must be assigned");
 
-            m_ObjectCountAsyncMetrics =  new Dictionary<int, AsyncMetric>();
+            m_AsyncMetrics =  new Dictionary<int, AsyncMetricFuture>();
 
             perceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
-                NativeArray<uint> objectCounts = ComputeObjectCounts(objectInfo);
+                var objectCounts = ComputeObjectCounts(objectInfo);
                 ObjectCountsComputed?.Invoke(frameCount, objectCounts, labelConfig.labelEntries);
                 ProduceObjectCountMetric(objectCounts, m_LabelConfig.labelEntries, frameCount);
             };
 
+            m_Definition = new MetricDefinition
+            {
+                id = k_Id,
+                description = k_Description
+            };
+
+            DatasetCapture.RegisterMetric(m_Definition);
             visualizationEnabled = supportsVisualization;
         }
 
@@ -104,14 +125,7 @@ namespace UnityEngine.Perception.GroundTruth
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
 #if true
-            if (m_ObjectCountMetricDefinition.Equals(default))
-            {
-                m_ObjectCountMetricDefinition = DatasetCapture.RegisterMetricDefinition("object count",
-                    m_LabelConfig.GetAnnotationSpecification(),
-                    "Counts of objects for each label in the sensor's view", id: new Guid(objectCountMetricId));
-            }
-
-            m_ObjectCountAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_ObjectCountMetricDefinition);
+            m_AsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_Definition);
 #endif
         }
 
@@ -133,13 +147,13 @@ namespace UnityEngine.Perception.GroundTruth
         {
             using (s_ClassCountCallback.Auto())
             {
-                if (!m_ObjectCountAsyncMetrics.TryGetValue(frameCount, out var classCountAsyncMetric))
+                if (!m_AsyncMetrics.TryGetValue(frameCount, out var classCountAsyncMetric))
                     return;
 
-                m_ObjectCountAsyncMetrics.Remove(frameCount);
+                m_AsyncMetrics.Remove(frameCount);
 
                 if (m_ClassCountValues == null || m_ClassCountValues.Length != entries.Count)
-                    m_ClassCountValues = new ClassCountValue[entries.Count];
+                    m_ClassCountValues = new ObjectCountMetric.Entry[entries.Count]; //ClassCountValue[entries.Count];
 
                 var visualize = visualizationEnabled;
 
@@ -151,11 +165,10 @@ namespace UnityEngine.Perception.GroundTruth
 
                 for (var i = 0; i < entries.Count; i++)
                 {
-                    m_ClassCountValues[i] = new ClassCountValue()
+                    m_ClassCountValues[i] = new ObjectCountMetric.Entry
                     {
-                        label_id = entries[i].id,
-                        label_name = entries[i].label,
-                        count = counts[i]
+                        labelName = entries[i].label,
+                        count = (int)counts[i]
                     };
 
                     // Only display entries with a count greater than 0
@@ -166,7 +179,15 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                 }
 
-                classCountAsyncMetric.ReportValues(m_ClassCountValues);
+                var payload = new ObjectCountMetric
+                {
+                    sensorId = "",
+                    annotationId = default,
+                    description = m_Definition.description,
+                    metadata = new Dictionary<string, object>(),
+                    objectCounts = m_ClassCountValues
+                };
+                classCountAsyncMetric.Report(payload);
             }
         }
 

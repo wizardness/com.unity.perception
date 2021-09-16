@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Unity.Collections;
 using Unity.Profiling;
 using UnityEngine.Serialization;
 using Unity.Simulation;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Perception.GroundTruth.Exporters.Solo;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
 using UnityEngine.Rendering;
-using UnityEngine.UI;
 
 namespace UnityEngine.Perception.GroundTruth
 {
@@ -18,24 +16,24 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class BoundingBox2DLabeler : CameraLabeler
     {
-        public class AnnotationDefinition : SoloDesign.AnnotationDefinition
+        public class BoundingBoxAnnotationDefinition : AnnotationDefinition
         {
             static readonly string k_Id = "bounding box";
             static readonly string k_Description = "Bounding box for each labeled object visible to the sensor";
             static readonly string k_AnnotationType = "bounding box";
 
-            public AnnotationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
+            public BoundingBoxAnnotationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
 
-            public AnnotationDefinition(IEnumerable<Entry> spec)
+            public BoundingBoxAnnotationDefinition(IEnumerable<DefinitionEntry> spec)
                 : base(k_Id, k_Description, k_AnnotationType)
             {
                 this.spec = spec;
             }
 
             [Serializable]
-            public struct Entry : IMessageProducer
+            public struct DefinitionEntry : IMessageProducer
             {
-                public Entry(int id, string name)
+                public DefinitionEntry(int id, string name)
                 {
                     labelId = id;
                     labelName = name;
@@ -50,7 +48,7 @@ namespace UnityEngine.Perception.GroundTruth
                 }
             }
 
-            public IEnumerable<Entry> spec;
+            public IEnumerable<DefinitionEntry> spec;
 
             public override void ToMessage(IMessageBuilder builder)
             {
@@ -63,13 +61,13 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
-        AnnotationDefinition m_AnnotationDefinition = new AnnotationDefinition();
+        AnnotationDefinition m_AnnotationDefinition = new BoundingBoxAnnotationDefinition();
 
         /// <summary>
         /// Bounding boxes for all of the labeled objects in a capture
         /// </summary>
         [Serializable]
-        public class BoundingBoxAnnotation : SoloDesign.Annotation
+        public class BoundingBoxAnnotation : Annotation
         {
             public struct Entry
             {
@@ -136,7 +134,7 @@ namespace UnityEngine.Perception.GroundTruth
         [FormerlySerializedAs("labelingConfiguration")]
         public IdLabelConfig idLabelConfig;
 
-        Dictionary<int, (AsyncAnnotation annotation, LabelEntryMatchCache labelEntryMatchCache)> m_AsyncData;
+        Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)> m_AsyncData;
         List<BoundingBoxAnnotation.Entry> m_BoundingBoxValues;
 
         Vector2 m_OriginalScreenSize = Vector2.zero;
@@ -190,10 +188,10 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("BoundingBox2DLabeler's idLabelConfig field must be assigned");
 
-            m_AsyncData = new Dictionary<int, (AsyncAnnotation annotation, LabelEntryMatchCache labelEntryMatchCache)>();
+            m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)>();
             m_BoundingBoxValues = new List<BoundingBoxAnnotation.Entry>();
 
-            DatasetCapture.RegisterAnnotationDefinition(new AnnotationDefinition());
+            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
 #if false
             m_BoundingBoxAnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("bounding box", idLabelConfig.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));

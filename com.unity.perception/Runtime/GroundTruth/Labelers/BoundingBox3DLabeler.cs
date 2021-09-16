@@ -80,7 +80,7 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxes3DReceived");
 //        AnnotationDefinition m_AnnotationDefinition;
 
-        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations;
+        Dictionary<int, AsyncAnnotationFuture> m_AsyncAnnotations;
         Dictionary<int, Dictionary<uint, BoxData>> m_BoundingBoxValues;
         List<BoxData> m_ToReport;
 
@@ -128,7 +128,7 @@ namespace UnityEngine.Perception.GroundTruth
 #endif
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderObjectInfosCalculated;
 
-            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotationFuture>();
             m_BoundingBoxValues = new Dictionary<int, Dictionary<uint, BoxData>>();
             m_ToReport = new List<BoxData>();
         }

@@ -1,17 +1,16 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Perception.GroundTruth.Exporters.Solo;
-using UnityEngine.Perception.GroundTruth.SoloDesign;
 
-namespace GroundTruth.SoloDesign
+namespace UnityEngine.Perception.GroundTruth.Consumers
 {
-    public class SoloMessageBuilder : PerceptionConsumer
+    public class SoloMessageBuilder : ConsumerEndpoint
     {
         public string _baseDirectory = "D:/PerceptionOutput/SoloMessageBuilder";
         public string soloDatasetName = "solo_mb";
