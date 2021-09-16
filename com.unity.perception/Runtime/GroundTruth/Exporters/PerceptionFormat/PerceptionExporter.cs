@@ -15,7 +15,6 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.PerceptionFormat
     {
         const Formatting k_Formatting = Formatting.Indented;
         string outputDirectory = string.Empty;
-        int captureFileIndex = 0;
 
         public string GetRgbCaptureFilename(params(string, object)[] additionalSensorValues)
         {
@@ -57,7 +56,7 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.PerceptionFormat
             Manager.Instance.ConsumerFileProduced(path);
         }
 
-        public Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState)
+        public Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState, int captureFileIndex)
         {
             //lazily allocate for fast zero-write frames
             var capturesJArray = new JArray();

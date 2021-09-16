@@ -92,7 +92,7 @@ namespace UnityEngine.Perception.GroundTruth.Exporters.PerceptionNew
 
         List<Task> m_PendingTasks = new List<Task>();
 
-        public Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState)
+        public Task ProcessPendingCaptures(List<SimulationState.PendingCapture> pendingCaptures, SimulationState simState, int captureFileIndex)
         {
             foreach (var cap in pendingCaptures)
             {

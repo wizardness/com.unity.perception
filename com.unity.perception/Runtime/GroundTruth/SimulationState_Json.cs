@@ -159,7 +159,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             void Write(List<PendingCapture> pendingCaptures, SimulationState simulationState, int captureFileIndex)
             {
-                GetActiveReporter()?.ProcessPendingCaptures(pendingCaptures, simulationState);
+                GetActiveReporter()?.ProcessPendingCaptures(pendingCaptures, simulationState, captureFileIndex);
 #if false
                 simulationState.m_SerializeCapturesAsyncSampler.Begin();
 
