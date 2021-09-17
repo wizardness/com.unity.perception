@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using Unity.Collections;
 using Unity.Profiling;
+using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.GroundTruth
@@ -14,6 +17,118 @@ namespace UnityEngine.Perception.GroundTruth
     /// </summary>
     public class BoundingBox3DLabeler : CameraLabeler
     {
+        public class BoundingBox3DAnnotationDefinition : AnnotationDefinition
+        {
+            static readonly string k_Id = "bounding box 3d";
+            static readonly string k_Description = "Produces 3D bounding box ground truth data for all visible objects that bear a label defined in this labeler's associated label configuration.";
+            static readonly string k_AnnotationType = "bounding box 3d";
+
+            public BoundingBox3DAnnotationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
+
+            public BoundingBox3DAnnotationDefinition(IEnumerable<DefinitionEntry> spec)
+                : base(k_Id, k_Description, k_AnnotationType)
+            {
+                this.spec = spec;
+            }
+
+            [Serializable]
+            public struct DefinitionEntry : IMessageProducer
+            {
+                public DefinitionEntry(int id, string name)
+                {
+                    labelId = id;
+                    labelName = name;
+                }
+
+                public int labelId;
+                public string labelName;
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("label_id", labelId);
+                    builder.AddString("label_name", labelName);
+                }
+            }
+
+            public IEnumerable<DefinitionEntry> spec;
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                foreach (var e in spec)
+                {
+                    var nested = builder.AddNestedMessageToVector("spec");
+                    e.ToMessage(nested);
+                }
+            }
+        }
+
+        [Serializable]
+        public class BoundingBoxAnnotation : Annotation
+        {
+            public struct Entry
+            {
+                /// <summary>
+                /// Integer identifier of the label
+                /// </summary>
+                public int labelId;
+                /// <summary>
+                /// String identifier of the label
+                /// </summary>
+                public string labelName;
+                /// <summary>
+                /// UUID of the instance
+                /// </summary>
+                public uint instanceId;
+                /// <summary>
+                /// 3d bounding box's center location in meters as center_x, center_y, center_z with respect to global coordinate system
+                /// </summary>
+                public Vector3 translation;
+                /// <summary>
+                /// 3d bounding box size in meters as width, length, height
+                /// </summary>
+                public Vector3 size;
+                /// <summary>
+                /// 3d bounding box orientation as quaternion: w, x, y, z
+                /// </summary>
+                public Quaternion rotation;
+                /// <summary>
+                /// [optional]: 3d bounding box velocity in meters per second as v_x, v_y, v_z
+                /// </summary>
+                public Vector3 velocity;
+                /// <summary>
+                /// [optional]: 3d bounding box acceleration in meters per second^2 as a_x, a_y, a_z
+                /// </summary>
+                public Vector3 acceleration;
+
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("instance_id", (int)instanceId);
+                    builder.AddInt("label_id", labelId);
+                    builder.AddString("label_name", labelName);
+                    builder.AddFloatVector("translation", Utils.ToFloatVector(translation));
+                    builder.AddFloatVector("size", Utils.ToFloatVector(size));
+                    builder.AddFloatVector("rotation", Utils.ToFloatVector(rotation.eulerAngles));
+                    builder.AddFloatVector("velocity", Utils.ToFloatVector(velocity));
+                    builder.AddFloatVector("acceleration", Utils.ToFloatVector(acceleration));
+                }
+            }
+
+            /// <summary>
+            /// The bounding boxes recorded by the annotator
+            /// </summary>
+            public List<Entry> boxes;
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                foreach (var e in boxes)
+                {
+                    var nested = builder.AddNestedMessageToVector("values");
+                    e.ToMessage(nested);
+                }
+            }
+        }
+
         ///<inheritdoc/>
         public override string description
         {
@@ -31,7 +146,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public IdLabelConfig idLabelConfig;
         // ReSharper restore MemberCanBePrivate.Global
-
+#if false
         /// <summary>
         /// Each 3D bounding box data record maps a tuple of (instance, label) to translation, size and rotation that draws a 3D bounding box,
         /// as well as velocity and acceleration (optional) of the 3D bounding box. All location data is given with respect to the sensor coordinate system.
@@ -76,15 +191,15 @@ namespace UnityEngine.Perception.GroundTruth
             /// </summary>
             public Vector3 acceleration;
         }
-
+#endif
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxes3DReceived");
-//        AnnotationDefinition m_AnnotationDefinition;
+        BoundingBox3DAnnotationDefinition m_AnnotationDefinition;
 
         Dictionary<int, AsyncAnnotationFuture> m_AsyncAnnotations;
-        Dictionary<int, Dictionary<uint, BoxData>> m_BoundingBoxValues;
-        List<BoxData> m_ToReport;
+        Dictionary<int, Dictionary<uint, BoundingBoxAnnotation.Entry>> m_BoundingBoxValues;
+        List<BoundingBoxAnnotation.Entry> m_ToReport;
 
-//        int m_CurrentFrame;
+        int m_CurrentFrame;
 
 
         /// <summary>
@@ -99,7 +214,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// Fired when the bounding boxes are computed for a frame.
         /// </summary>
-        public event Action<int, List<BoxData>> BoundingBoxComputed;
+        public event Action<int, List<BoundingBoxAnnotation.Entry>> BoundingBoxComputed;
 
         /// <summary>
         /// Creates a new BoundingBox3DLabeler. Be sure to assign <see cref="idLabelConfig"/> before adding to a <see cref="PerceptionCamera"/>.
@@ -120,26 +235,26 @@ namespace UnityEngine.Perception.GroundTruth
         {
             if (idLabelConfig == null)
                 throw new InvalidOperationException("BoundingBox3DLabeler's idLabelConfig field must be assigned");
-#if false
-            m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("bounding box 3D", idLabelConfig.GetAnnotationSpecification(),
-                "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
-#else
-//            m_AnnotationDefinition = new AnnotationDefinition();
-#endif
+
+            var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBox3DAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
+            m_AnnotationDefinition = new BoundingBox3DAnnotationDefinition(spec);
+
+            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderObjectInfosCalculated;
 
             m_AsyncAnnotations = new Dictionary<int, AsyncAnnotationFuture>();
-            m_BoundingBoxValues = new Dictionary<int, Dictionary<uint, BoxData>>();
-            m_ToReport = new List<BoxData>();
+            m_BoundingBoxValues = new Dictionary<int, Dictionary<uint, BoundingBoxAnnotation.Entry>>();
+            m_ToReport = new List<BoundingBoxAnnotation.Entry>();
         }
 
-        static BoxData ConvertToBoxData(IdLabelEntry label, uint instanceId, Vector3 center, Vector3 extents, Quaternion rot)
+        static BoundingBoxAnnotation.Entry ConvertToBoxData(IdLabelEntry label, uint instanceId, Vector3 center, Vector3 extents, Quaternion rot)
         {
-            return new BoxData
+            return new BoundingBoxAnnotation.Entry
             {
-                label_id = label.id,
-                label_name = label.label,
-                instance_id = instanceId,
+                labelId = label.id,
+                labelName = label.label,
+                instanceId = instanceId,
                 translation = center,
                 size = extents * 2,
                 rotation = rot,
@@ -179,16 +294,14 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
-#if false
             m_CurrentFrame = Time.frameCount;
 
-            m_BoundingBoxValues[m_CurrentFrame] = new Dictionary<uint, BoxData>();
+            m_BoundingBoxValues[m_CurrentFrame] = new Dictionary<uint, BoundingBoxAnnotation.Entry>();
 
             m_AsyncAnnotations[m_CurrentFrame] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_AnnotationDefinition);
 
             foreach (var label in LabelManager.singleton.registeredLabels)
                 ProcessLabel(label);
-#endif
         }
 
         void OnRenderObjectInfosCalculated(int frameCount, NativeArray<RenderedObjectInfo> renderedObjectInfos)
@@ -217,7 +330,17 @@ namespace UnityEngine.Perception.GroundTruth
                 }
 
                 BoundingBoxComputed?.Invoke(frameCount, m_ToReport);
-//                asyncAnnotation.ReportValues(m_ToReport);
+
+                var toReport = new BoundingBoxAnnotation
+                {
+                    sensorId = perceptionCamera.ID,
+                    Id = m_AnnotationDefinition.id,
+                    description = m_AnnotationDefinition.description,
+                    annotationType = m_AnnotationDefinition.annotationType,
+                    boxes = m_ToReport
+                };
+
+                asyncAnnotation.Report(toReport);
             }
         }
 
@@ -306,7 +429,7 @@ namespace UnityEngine.Perception.GroundTruth
 
                     var converted = ConvertToBoxData(labelEntry, labeledEntity.instanceId, combinedBounds.center, combinedBounds.extents, cameraRotation);
 
-//                    m_BoundingBoxValues[m_CurrentFrame][labeledEntity.instanceId] = converted;
+                    m_BoundingBoxValues[m_CurrentFrame][labeledEntity.instanceId] = converted;
                 }
             }
         }

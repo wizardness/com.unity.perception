@@ -185,6 +185,9 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                     case SemanticSegmentationLabeler.SemanticSegmentation seg:
                         annotations.Add(ConvertAnnotation(frame, seg));
                         break;
+                    case BoundingBox3DLabeler.BoundingBoxAnnotation bbox:
+                        annotations.Add(ConvertAnnotation(frame, bbox));
+                        break;
                 }
             }
 
@@ -224,6 +227,31 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 ["annotationId"] = metric.annotationId,
                 ["description"] = metric.description
             };
+        }
+
+        static JToken ConvertAnnotation(Frame frame, BoundingBox3DLabeler.BoundingBoxAnnotation bbox)
+        {
+            var outBox = ToAnnotationHeader(frame, bbox);
+            var values = new JArray();
+
+            foreach (var box in bbox.boxes)
+            {
+                values.Add(new JObject
+                {
+                    ["frame"] = frame.frame,
+                    ["label_name"] = box.labelName,
+                    ["instance_id"] = box.instanceId,
+                    ["translation"] = FromVector3(box.translation),
+                    ["size"] = FromVector3(box.size),
+                    ["rotation"] = FromVector3(box.rotation.eulerAngles),
+                    ["velocity"] = FromVector3(box.velocity),
+                    ["acceleration"] = FromVector3(box.acceleration)
+                });
+            }
+
+            outBox["values"] = values;
+
+            return outBox;
         }
 
         static JToken ConvertAnnotation(Frame frame, BoundingBox2DLabeler.BoundingBoxAnnotation bbox)
