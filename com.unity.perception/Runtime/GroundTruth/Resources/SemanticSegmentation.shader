@@ -4,8 +4,8 @@
     {
         _MainTex ("Texture", 2D) = "white" {}
         _BaseColor("Color", Color) = (1,1,1,1)
-        _EnableTransparency ("Enable Transparency", Range(0,1)) = 1
-        _TransparencyThreshold ("Transparency Threshold", Range(0,1)) = 1
+       // _EnableTransparency ("Enable Transparency", Range(0,1)) = 1
+       // _TransparencyThreshold ("Transparency Threshold", Range(0,1)) = 1
         _TextureIsSegmentationMask ("Use Texture as Segmentation Mask", Range(0,1)) = 0
         [PerObjectData] LabelingId("Labeling Id", Vector) = (0,0,0,1)
     }
@@ -22,7 +22,7 @@
 
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Tags { "RenderType"="Opaque" }
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
         LOD 100
@@ -48,8 +48,9 @@
             sampler2D _MainTex;
             float4 _MainTex_ST;
             fixed4 _BaseColor;
-            float _TransparencyThreshold;
+            //float _TransparencyThreshold;
             float _TextureIsSegmentationMask;
+            //float _EnableTransparency;
 
             struct in_vert
             {
@@ -74,23 +75,23 @@
             fixed4 semanticSegmentationFragmentStage (vertexToFragment vertScreenSpace) : SV_Target
             {
                 fixed4 col = tex2D(_MainTex, vertScreenSpace.uv);
-                //LabelingId = _BaseColor;
+
                 fixed4 outColor = LabelingId;
 
-                // if (_TextureIsSegmentationMask == 1)
-                // {
-                //     if (col.r == 0 && col.g == 0 && col.b == 0)
-                //         outColor = fixed4(0,0,0,1);
-                //
-                //     return outColor;
-                // }
+                if (_TextureIsSegmentationMask == 1)
+                {
+                    if (col.r == 0 && col.g == 0 && col.b == 0)
+                        outColor = fixed4(0,0,0,1);
 
-                //float opacity = col.a * _BaseColor.a;
-                float opacity = 2;
-                if (opacity < _TransparencyThreshold)
-                    outColor.a = 0;
-                else
-                    outColor.a = 1;
+                    return outColor;
+                }
+
+                // //float opacity = col.a * _BaseColor.a;
+                // float opacity = 2;
+                // if (opacity < _TransparencyThreshold)
+                //     outColor.a = 0;
+                // else
+                //     outColor.a = 1;
 
                 return outColor;
             }

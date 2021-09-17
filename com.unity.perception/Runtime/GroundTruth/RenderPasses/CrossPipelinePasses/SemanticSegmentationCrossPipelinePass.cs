@@ -78,13 +78,15 @@ namespace UnityEngine.Perception.GroundTruth
             // Set the labeling ID so that it can be accessed in ClassSemanticSegmentationPass.shader
             mpb.SetVector(k_LabelingId, found ? entry.color : Color.black);
 
+            Texture mainTex = null;
+
             if (renderer && renderer.material)
             {
                 if (renderer.material.HasProperty("_MainTex"))
                 {
-                    var maintex = renderer.material.GetTexture("_MainTex");
-                    if (maintex)
-                        mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
+                    mainTex = renderer.material.GetTexture("_MainTex");
+                    // if (maintex)
+                    //     mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
                 }
                 mpb.SetColor("_BaseColor", renderer.material.color);
             }
@@ -95,13 +97,17 @@ namespace UnityEngine.Perception.GroundTruth
                 if (segBeh.useSegmentationMask)
                 {
                     mpb.SetFloat("_TextureIsSegmentationMask", 1);
-                    if (segBeh.useSegmentationMask)
+                    if (segBeh.useMainTextureAsSegmask)
                     {
-                        mpb.SetTexture("_MainTex", segBeh.segmentationMask);
+                        if (mainTex == null)
+                            Debug.LogError("No texture found on object");
+                        else
+                            mpb.SetTexture("_MainTex", mainTex);
                     }
+                    else
+                        mpb.SetTexture("_MainTex", segBeh.segmentationMask);
                 }
-
-                mpb.SetFloat("_TransparencyThreshold", segBeh.opacityThreshold);
+                //mpb.SetFloat("_TransparencyThreshold", segBeh.opacityThreshold);
             }
 
         }

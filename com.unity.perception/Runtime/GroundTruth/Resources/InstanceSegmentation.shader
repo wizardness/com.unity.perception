@@ -4,8 +4,8 @@
     {
         _MainTex ("Texture", 2D) = "white" {}
         _BaseColor("Color", Color) = (1,1,1,1)
-        _EnableTransparency ("Enable Transparency", Range(0,1)) = 1
-        _TransparencyThreshold ("Transparency Threshold", Range(0,1)) = 1
+        //_EnableTransparency ("Enable Transparency", Range(0,1)) = 1
+        //_TransparencyThreshold ("Transparency Threshold", Range(0,1)) = 1
         _TextureIsSegmentationMask ("Use Texture as Segmentation Mask", Range(0,1)) = 0
         [PerObjectData] _SegmentationId("Segmentation ID", vector) = (0,0,0,1)
     }
@@ -31,9 +31,9 @@
             sampler2D _MainTex;
             fixed4 _BaseColor;
             float4 _MainTex_ST;
-            float _TransparencyThreshold;
+            //float _TransparencyThreshold;
             float _TextureIsSegmentationMask;
-            float _EnableTransparency;
+            //float _EnableTransparency;
 
             struct appdata
             {
@@ -71,11 +71,12 @@
                     return outColor;
                 }
 
-                float opacity = 1 * _BaseColor.a;
-                if (opacity < _TransparencyThreshold)
-                    outColor.a = 0;
-                else
-                    outColor.a = 1;
+                // float opacity = 1 * _BaseColor.a;
+                // if (opacity < _TransparencyThreshold)
+                //     outColor.a = 0;
+                // else
+                //     outColor.a = 1;
+
                 return outColor;
             }
             ENDCG
