@@ -6,7 +6,10 @@ using System.Linq;
 using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Simulation;
+using UnityEditor;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
@@ -25,24 +28,70 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class SemanticSegmentationLabeler : CameraLabeler, IOverlayPanelProvider
     {
-        ///<inheritdoc/>
-        public override string description
+        [Serializable]
+        public class SemanticSegmentationDefinition : AnnotationDefinition
         {
-            get => "Generates a semantic segmentation image for each captured frame. Each object is rendered to the semantic segmentation image using the color associated with it based on this labeler's associated semantic segmentation label configuration. " +
-                   "Semantic segmentation images are saved to the dataset in PNG format. " +
-                   "Please note that only one " + GetType().Name + " can render at once across all cameras.";
-            protected set {}
+            static readonly string k_Id = "semantic segmentation";
+            static readonly string k_Description = "Generates a semantic segmentation image for each captured frame. " +
+                "Each object is rendered to the semantic segmentation image using the color associated with it based on " +
+                "this labeler's associated semantic segmentation label configuration. Semantic segmentation images are saved " +
+                "to the dataset in PNG format. Please note that only one SemanticSegmentationLabeler can render at once across all cameras.";
+            static readonly string k_AnnotationType = "semantic segmentation";
+
+            public IEnumerable<DefinitionEntry> spec;
+
+            public SemanticSegmentationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
+
+            public SemanticSegmentationDefinition(IEnumerable<DefinitionEntry> spec)
+                : base(k_Id, k_Description, k_AnnotationType)
+            {
+                this.spec = spec;
+            }
+
+            public struct DefinitionEntry : IMessageProducer
+            {
+                public DefinitionEntry(string name, Color pixelValue)
+                {
+                    labelName = name;
+                    this.pixelValue = pixelValue;
+                }
+
+                public string labelName;
+                public Color pixelValue;
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddString("label_name", labelName);
+                    builder.AddIntVector("pixel_value", Utils.ToIntVector(pixelValue));
+                }
+            }
         }
 
-        const string k_SemanticSegmentationDirectory = "SemanticSegmentation";
-        const string k_SegmentationFilePrefix = "segmentation_";
-        internal string semanticSegmentationDirectory;
+        SemanticSegmentationDefinition m_AnnotationDefinition;
 
-        /// <summary>
-        /// The id to associate with semantic segmentation annotations in the dataset.
-        /// </summary>
-        [Tooltip("The id to associate with semantic segmentation annotations in the dataset.")]
-        public string annotationId = "12f94d8d-5425-4deb-9b21-5e53ad957d66";
+        [Serializable]
+        public class SemanticSegmentation : Annotation
+        {
+            public IEnumerable<SemanticSegmentationDefinition.DefinitionEntry> instances;
+            public string imageFormat;
+            public Vector2 dimension;
+            public byte[] buffer;
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                builder.AddString("image_format", imageFormat);
+                builder.AddFloatVector("dimension", new[] { dimension.x, dimension.y });
+                builder.AddPngImage("semantic_segmentation", buffer);
+                var nested = builder.AddNestedMessage("instances");
+                foreach (var i in instances)
+                {
+                    i.ToMessage(nested);
+                }
+            }
+        }
+
+        public static string annotationId = "semantic segmentation";
+
         /// <summary>
         /// The SemanticSegmentationLabelConfig which maps labels to pixel values.
         /// </summary>
@@ -122,21 +171,18 @@ namespace UnityEngine.Perception.GroundTruth
             m_TargetTextureOverride = targetTextureOverride;
         }
 
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
-        struct SemanticSegmentationSpec
-        {
-            [UsedImplicitly]
-            public string label_name;
-            [UsedImplicitly]
-            public Color pixel_value;
-        }
-
         struct AsyncSemanticSegmentationWrite
         {
+            public AsyncAnnotationFuture future;
             public NativeArray<Color32> data;
             public int width;
             public int height;
-            public string path;
+        }
+
+        public override string description
+        {
+            get => string.Empty;
+            protected set { }
         }
 
         /// <inheritdoc/>
@@ -172,7 +218,6 @@ namespace UnityEngine.Perception.GroundTruth
 
             targetTexture.Create();
             targetTexture.name = "Labeling";
-            semanticSegmentationDirectory = k_SemanticSegmentationDirectory + Guid.NewGuid();
 
 #if HDRP_PRESENT
             var gameObject = perceptionCamera.gameObject;
@@ -200,52 +245,34 @@ namespace UnityEngine.Perception.GroundTruth
             m_LensDistortionPass = new LensDistortionUrpPass(myCamera, targetTexture);
             perceptionCamera.AddScriptableRenderPass(m_LensDistortionPass);
 #endif
-
-            var specs = labelConfig.labelEntries.Select((l) => new SemanticSegmentationSpec()
+            var specs = labelConfig.labelEntries.Select(l => new SemanticSegmentationDefinition.DefinitionEntry
             {
-                label_name = l.label,
-                pixel_value = l.color
+                labelName = l.label,
+                pixelValue = l.color
             });
 
             if (labelConfig.skyColor != Color.black)
             {
-                specs = specs.Append(new SemanticSegmentationSpec()
+                specs = specs.Append(new SemanticSegmentationDefinition.DefinitionEntry
                 {
-                    label_name = "sky",
-                    pixel_value = labelConfig.skyColor
+                    labelName = "sky",
+                    pixelValue = labelConfig.skyColor
                 });
             }
-#if false
-            m_SemanticSegmentationAnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition(
-                "semantic segmentation",
-                specs.ToArray(),
-                "pixel-wise semantic segmentation label",
-                "PNG",
-                id: Guid.Parse(annotationId));
-#else
-//            m_SemanticSegmentationAnnotationDefinition = new AnnotationDefinition();
-#endif
+
+            m_AnnotationDefinition = new SemanticSegmentationDefinition(specs);
+            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+
             m_SemanticSegmentationTextureReader = new RenderTextureReader<Color32>(targetTexture);
             visualizationEnabled = supportsVisualization;
         }
 
         void OnSemanticSegmentationImageRead(int frameCount, NativeArray<Color32> data)
         {
-            if (!m_AsyncAnnotations.TryGetValue(frameCount, out var annotation))
+            if (!m_AsyncAnnotations.TryGetValue(frameCount, out var future))
                 return;
 
-            var info = new SegmentationValue[]
-            {
-                new SegmentationValue
-                {
-                    frame = frameCount
-                }
-            };
-
-            var datasetRelativePath = $"{semanticSegmentationDirectory}/{k_SegmentationFilePrefix}{frameCount}.png";
-            var localPath = $"{Manager.Instance.GetDirectoryFor(semanticSegmentationDirectory)}/{k_SegmentationFilePrefix}{frameCount}.png";
-
-//            annotation.ReportFileAndValues(datasetRelativePath, info);
+            m_AsyncAnnotations.Remove(frameCount);
 
             var asyncRequest = Manager.Instance.CreateRequest<AsyncRequest<AsyncSemanticSegmentationWrite>>();
 
@@ -257,20 +284,31 @@ namespace UnityEngine.Perception.GroundTruth
             });
             asyncRequest.data = new AsyncSemanticSegmentationWrite
             {
+                future = future,
                 data = new NativeArray<Color32>(data, Allocator.Persistent),
                 width = targetTexture.width,
                 height = targetTexture.height,
-                path = localPath
             };
             asyncRequest.Enqueue((r) =>
             {
                 Profiler.BeginSample("Encode");
                 var pngBytes = ImageConversion.EncodeArrayToPNG(r.data.data.ToArray(), GraphicsFormat.R8G8B8A8_UNorm, (uint)r.data.width, (uint)r.data.height);
                 Profiler.EndSample();
-                Profiler.BeginSample("WritePng");
-                File.WriteAllBytes(r.data.path, pngBytes);
-                Manager.Instance.ConsumerFileProduced(r.data.path);
-                Profiler.EndSample();
+
+                var toReport = new SemanticSegmentation
+                {
+                    instances = m_AnnotationDefinition.spec,
+                    sensorId = perceptionCamera.ID,
+                    Id = m_AnnotationDefinition.id,
+                    annotationType = m_AnnotationDefinition.annotationType,
+                    description = m_AnnotationDefinition.description,
+                    imageFormat = "png",
+                    dimension = new Vector2(r.data.width, r.data.height),
+                    buffer = pngBytes
+                };
+
+                r.data.future.Report(toReport);
+
                 r.data.data.Dispose();
                 return AsyncRequest.Result.Completed;
             });
@@ -280,11 +318,9 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnEndRendering(ScriptableRenderContext scriptableRenderContext)
         {
-#if false
-            m_AsyncAnnotations[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_SemanticSegmentationAnnotationDefinition);
+            m_AsyncAnnotations[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_AnnotationDefinition);
             m_SemanticSegmentationTextureReader.Capture(scriptableRenderContext,
                 (frameCount, data, renderTexture) => OnSemanticSegmentationImageRead(frameCount, data));
-#endif
         }
 
         /// <inheritdoc/>

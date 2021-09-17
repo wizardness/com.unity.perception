@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Profiling;
 using UnityEngine.Serialization;
@@ -61,7 +62,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
-        AnnotationDefinition m_AnnotationDefinition = new BoundingBoxAnnotationDefinition();
+        BoundingBoxAnnotationDefinition m_AnnotationDefinition;
 
         /// <summary>
         /// Bounding boxes for all of the labeled objects in a capture
@@ -190,6 +191,9 @@ namespace UnityEngine.Perception.GroundTruth
 
             m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)>();
             m_BoundingBoxValues = new List<BoundingBoxAnnotation.Entry>();
+
+            var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBoxAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
+            m_AnnotationDefinition = new BoundingBoxAnnotationDefinition(spec);
 
             DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
 #if false

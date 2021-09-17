@@ -182,6 +182,9 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                     case InstanceSegmentationLabeler.InstanceSegmentation seg:
                         annotations.Add(ConvertAnnotation(frame, seg));
                         break;
+                    case SemanticSegmentationLabeler.SemanticSegmentation seg:
+                        annotations.Add(ConvertAnnotation(frame, seg));
+                        break;
                 }
             }
 
@@ -268,7 +271,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             // write out the png data
             var path = GetSequenceDirectoryPath(frame);
 
-            path = Path.Combine(path,$"step{frame.step}.segmentation.{segmentation.imageFormat}");
+            path = Path.Combine(path,$"step{frame.step}.instance.segmentation.{segmentation.imageFormat}");
             var file = File.Create(path, 4096);
             file.Write(segmentation.buffer, 0, segmentation.buffer.Length);
             file.Close();
@@ -282,6 +285,36 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 {
                     ["instance_id"] = i.instanceId,
                     ["rgba"] = FromColor32(i.rgba)
+                });
+            }
+
+            outSeg["imageFormat"] = segmentation.imageFormat;
+            outSeg["dimension"] = FromVector2(segmentation.dimension);
+            outSeg["imagePath"] = path;
+            outSeg["instances"] = values;
+
+            return outSeg;
+        }
+
+        static JToken ConvertAnnotation(Frame frame, SemanticSegmentationLabeler.SemanticSegmentation segmentation)
+        {
+            // write out the png data
+            var path = GetSequenceDirectoryPath(frame);
+
+            path = Path.Combine(path,$"step{frame.step}.semantic.segmentation.{segmentation.imageFormat}");
+            var file = File.Create(path, 4096);
+            file.Write(segmentation.buffer, 0, segmentation.buffer.Length);
+            file.Close();
+
+            var outSeg = ToAnnotationHeader(frame, segmentation);
+            var values = new JArray();
+
+            foreach (var i in segmentation.instances)
+            {
+                values.Add(new JObject
+                {
+                    ["label_name"] = i.labelName,
+                    ["rgba"] = FromColor32(i.pixelValue)
                 });
             }
 
