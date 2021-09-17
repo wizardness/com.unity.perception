@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.GroundTruth
@@ -17,6 +19,157 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class KeypointLabeler : CameraLabeler
     {
+        [Serializable]
+        public struct Keypoint : IMessageProducer
+        {
+            /// <summary>
+            /// The index of the keypoint in the template file
+            /// </summary>
+            public int index;
+            public Vector2 location;
+            /// <summary>
+            /// The state of the point,
+            /// 0 = not present,
+            /// 1 = keypoint is present but not visible,
+            /// 2 = keypoint is present and visible
+            /// </summary>
+            public int state;
+
+            public void ToMessage(IMessageBuilder builder)
+            {
+                builder.AddInt("index", index);
+                builder.AddFloatVector("location", Utils.ToFloatVector(location));
+                builder.AddInt("state", state);
+            }
+        }
+
+        public class Definition : AnnotationDefinition
+        {
+            static readonly string k_Id = "keypoints";
+            static readonly string k_Description = "Produces keypoint annotations for all visible labeled objects that have a humanoid animation avatar component.";
+            static readonly string k_AnnotationType = "keypoints";
+
+            public IEnumerable<Entry> entries;
+
+            public Definition() : base(k_Id, k_Description, k_AnnotationType) { }
+
+            public Definition(IEnumerable<Entry> entries)
+                : base(k_Id, k_Description, k_AnnotationType)
+            {
+                this.entries = entries;
+            }
+
+            [Serializable]
+            public struct JointDefinition : IMessageProducer
+            {
+                public string label;
+                public int index;
+                public Color color;
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddString("label", label);
+                    builder.AddInt("index", index);
+                    builder.AddIntVector("color", Utils.ToIntVector(color));
+                }
+            }
+
+            [Serializable]
+            public struct SkeletonDefinition : IMessageProducer
+            {
+                public int joint1;
+                public int joint2;
+                public Color color;
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("joint1", joint1);
+                    builder.AddInt("joint2", joint2);
+                    builder.AddIntVector("color", Utils.ToIntVector(color));
+                }
+            }
+
+            [Serializable]
+            public struct Entry : IMessageProducer
+            {
+                public int labelId;
+                public string labelName;
+                public string templateId;
+                public string templateName;
+                public JointDefinition[] keyPoints;
+                public SkeletonDefinition[] skeleton;
+
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("label_id", labelId);
+                    builder.AddString("label_name", labelName);
+                    builder.AddString("template_id", templateId);
+                    builder.AddString("template_name", templateName);
+                    var nested = builder.AddNestedMessage("keypoints");
+                    foreach (var kp in keyPoints)
+                    {
+                        kp.ToMessage(nested);
+                    }
+                    nested = builder.AddNestedMessage("skeleton");
+                    foreach (var bone in skeleton)
+                    {
+                        bone.ToMessage(nested);
+                    }
+                }
+            }
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                foreach (var e in entries)
+                {
+                    var nested = builder.AddNestedMessageToVector("entries");
+                    e.ToMessage(nested);
+                }
+            }
+        }
+
+        public class Annotation : DataModel.Annotation
+        {
+            public IEnumerable<Entry> entries;
+
+            [Serializable]
+            public class Entry : IMessageProducer
+            {
+                /// <summary>
+                /// The label id of the entity
+                /// </summary>
+                public int labelId;
+                /// <summary>
+                /// The instance id of the entity
+                /// </summary>
+                public uint instanceId;
+                /// <summary>
+                /// The template that the points are based on
+                /// </summary>
+                public string templateGuid;
+                /// <summary>
+                /// Pose ground truth for the current set of keypoints
+                /// </summary>
+                public string pose = "unset";
+                /// <summary>
+                /// Array of all of the keypoints
+                /// </summary>
+                public Keypoint[] keypoints;
+
+                public void ToMessage(IMessageBuilder builder)
+                {
+                    builder.AddInt("instance_id", (int)instanceId);
+                    builder.AddInt("label_id", labelId);
+                    builder.AddString("template_guid", templateGuid);
+                    builder.AddString("pose", pose);
+                    var nested = builder.AddNestedMessage("keypoints");
+                    foreach (var keypoint in keypoints)
+                    {
+                        keypoint.ToMessage(nested);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// The active keypoint template. Required to annotate keypoint data.
         /// </summary>
@@ -36,7 +189,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// The GUID id to associate with the annotations produced by this labeler.
         /// </summary>
-        public static string annotationId = "8b3ef246-daa7-4dd5-a0e8-a943f6e7f8c2";
+        public static string annotationId = "keypoints";
         /// <summary>
         /// The <see cref="IdLabelConfig"/> which associates objects with labels.
         /// </summary>
@@ -49,18 +202,18 @@ namespace UnityEngine.Perception.GroundTruth
         public KeypointObjectFilter objectFilter;
         // ReSharper restore MemberCanBePrivate.Global
 
-//        AnnotationDefinition m_AnnotationDefinition;
+        AnnotationDefinition m_AnnotationDefinition;
         Texture2D m_MissingTexture;
 
-        Dictionary<int, (AsyncAnnotationFuture annotation, Dictionary<uint, KeypointEntry> keypoints)> m_AsyncAnnotations;
-        List<KeypointEntry> m_KeypointEntriesToReport;
+        Dictionary<int, (AsyncAnnotationFuture annotation, Dictionary<uint, Annotation.Entry> keypoints)> m_AsyncAnnotations;
+        List<Annotation.Entry> m_KeypointEntriesToReport;
 
         int m_CurrentFrame;
 
         /// <summary>
         /// Action that gets triggered when a new frame of key points are computed.
         /// </summary>
-        public event Action<int, List<KeypointEntry>> KeypointsComputed;
+        public event Action<int, List<Annotation.Entry>> KeypointsComputed;
 
         /// <summary>
         /// Creates a new key point labeler. This constructor creates a labeler that
@@ -92,19 +245,17 @@ namespace UnityEngine.Perception.GroundTruth
         {
             if (idLabelConfig == null)
                 throw new InvalidOperationException($"{nameof(KeypointLabeler)}'s idLabelConfig field must be assigned");
-#if false
-            m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("keypoints", TemplateToJson(activeTemplate, idLabelConfig),
-                "pixel coordinates of keypoints in a model, along with skeletal connectivity data", id: new Guid(annotationId));
-#else
-//            m_AnnotationDefinition = new AnnotationDefinition();
-#endif
+
+            m_AnnotationDefinition = new Definition(TemplateToJson(activeTemplate, idLabelConfig));
+            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+
             // Texture to use in case the template does not contain a texture for the joints or the skeletal connections
             m_MissingTexture = new Texture2D(1, 1);
 
             m_KnownStatus = new Dictionary<uint, CachedData>();
 
-            m_AsyncAnnotations = new Dictionary<int, (AsyncAnnotationFuture, Dictionary<uint, KeypointEntry>)>();
-            m_KeypointEntriesToReport = new List<KeypointEntry>();
+            m_AsyncAnnotations = new Dictionary<int, (AsyncAnnotationFuture, Dictionary<uint, Annotation.Entry>)>();
+            m_KeypointEntriesToReport = new List<Annotation.Entry>();
             m_CurrentFrame = 0;
 
             perceptionCamera.InstanceSegmentationImageReadback += OnInstanceSegmentationImageReadback;
@@ -143,8 +294,8 @@ namespace UnityEngine.Perception.GroundTruth
         {
             if (keypoint.state == 0) return 0;
 
-            var centerX = Mathf.FloorToInt(keypoint.x);
-            var centerY = Mathf.FloorToInt(keypoint.y);
+            var centerX = Mathf.FloorToInt(keypoint.location.x);
+            var centerY = Mathf.FloorToInt(keypoint.location.y);
 
             if (!PixelOnScreen(centerX, centerY, dimensions))
                 return 0;
@@ -186,13 +337,12 @@ namespace UnityEngine.Perception.GroundTruth
 
                         if (keypoint.state == 0)
                         {
-                            keypoint.x = 0;
-                            keypoint.y = 0;
+                            keypoint.location = Vector2.zero;
                         }
                         else
                         {
-                            keypoint.x = math.clamp(keypoint.x, 0, dimensions.width - .001f);
-                            keypoint.y = math.clamp(keypoint.y, 0, dimensions.height - .001f);
+                            keypoint.location.x = math.clamp(keypoint.location.x, 0, dimensions.width - .001f);
+                            keypoint.location.y = math.clamp(keypoint.location.y, 0, dimensions.height - .001f);
                         }
 
                         keypointSet.Value.keypoints[i] = keypoint;
@@ -222,7 +372,7 @@ namespace UnityEngine.Perception.GroundTruth
                 {
                     foreach (var objectInfo in objectInfos)
                     {
-                        if (entry.instance_id == objectInfo.instanceId)
+                        if (entry.instanceId == objectInfo.instanceId)
                         {
                             include = true;
                             break;
@@ -238,26 +388,34 @@ namespace UnityEngine.Perception.GroundTruth
 
             //This code assumes that OnRenderedObjectInfoReadback will be called immediately after OnInstanceSegmentationImageReadback
             KeypointsComputed?.Invoke(frameCount, m_KeypointEntriesToReport);
-//            asyncAnnotation.annotation.ReportValues(m_KeypointEntriesToReport);
+
+            var toReport = new Annotation
+            {
+                sensorId = perceptionCamera.ID,
+                Id = m_AnnotationDefinition.id,
+                annotationType = m_AnnotationDefinition.annotationType,
+                description = m_AnnotationDefinition.description,
+                entries = m_KeypointEntriesToReport
+            };
+
+            asyncAnnotation.annotation.Report(toReport);
         }
 
         /// <param name="scriptableRenderContext"></param>
         /// <inheritdoc/>
         protected override void OnEndRendering(ScriptableRenderContext scriptableRenderContext)
         {
-#if false
             m_CurrentFrame = Time.frameCount;
 
             var annotation = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_AnnotationDefinition);
-            var keypoints = new Dictionary<uint, KeypointEntry>();
+            var keypoints = new Dictionary<uint, Annotation.Entry>();
 
             m_AsyncAnnotations[m_CurrentFrame] = (annotation, keypoints);
 
             foreach (var label in LabelManager.singleton.registeredLabels)
                 ProcessLabel(m_CurrentFrame, label);
-#endif
         }
-
+#if false
         // ReSharper disable InconsistentNaming
         // ReSharper disable NotAccessedField.Global
         // ReSharper disable NotAccessedField.Local
@@ -321,7 +479,7 @@ namespace UnityEngine.Perception.GroundTruth
         // ReSharper restore InconsistentNaming
         // ReSharper restore NotAccessedField.Global
         // ReSharper restore NotAccessedField.Local
-
+#endif
         float GetCaptureHeight()
         {
             var targetTexture = perceptionCamera.attachedCamera.targetTexture;
@@ -344,7 +502,7 @@ namespace UnityEngine.Perception.GroundTruth
         {
             public bool status;
             public Animator animator;
-            public KeypointEntry keypoints;
+            public Annotation.Entry keypoints;
             public List<(JointLabel, int)> overrides;
         }
 
@@ -398,16 +556,15 @@ namespace UnityEngine.Perception.GroundTruth
                 {
                     status = false,
                     animator = null,
-                    keypoints = new KeypointEntry(),
+                    keypoints = new Annotation.Entry(),
                     overrides = new List<(JointLabel, int)>()
                 };
 
                 var entityGameObject = labeledEntity.gameObject;
 
-                cached.keypoints.instance_id = labeledEntity.instanceId;
-                cached.keypoints.label_id = labelEntry.id;
-                cached.keypoints.frame = -1;
-                cached.keypoints.template_guid = activeTemplate.templateID;
+                cached.keypoints.instanceId = labeledEntity.instanceId;
+                cached.keypoints.labelId = labelEntry.id;
+                cached.keypoints.templateGuid = activeTemplate.templateID;
 
                 cached.keypoints.keypoints = new Keypoint[activeTemplate.keypoints.Length];
                 for (var i = 0; i < cached.keypoints.keypoints.Length; i++)
@@ -435,7 +592,6 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             var cachedData = m_KnownStatus[labeledEntity.instanceId];
-            cachedData.keypoints.frame = frame;
 
             if (cachedData.status)
             {
@@ -472,14 +628,13 @@ namespace UnityEngine.Perception.GroundTruth
 
 
                 var cachedKeypointEntry = cachedData.keypoints;
-                var keypointEntry = new KeypointEntry()
+                var keypointEntry = new Annotation.Entry
                 {
-                    frame = cachedKeypointEntry.frame,
-                    instance_id = cachedKeypointEntry.instance_id,
+                    instanceId = cachedKeypointEntry.instanceId,
                     keypoints = cachedKeypointEntry.keypoints.ToArray(),
-                    label_id = cachedKeypointEntry.label_id,
+                    labelId = cachedKeypointEntry.labelId,
                     pose = cachedKeypointEntry.pose,
-                    template_guid = cachedKeypointEntry.template_guid
+                    templateGuid = cachedKeypointEntry.templateGuid
                 };
                 m_AsyncAnnotations[m_CurrentFrame].keypoints[labeledEntity.instanceId] = keypointEntry;
             }
@@ -491,14 +646,12 @@ namespace UnityEngine.Perception.GroundTruth
             keypoints[idx].index = idx;
             if (loc.z < 0)
             {
-                keypoints[idx].x = 0;
-                keypoints[idx].y = 0;
+                keypoints[idx].location = Vector2.zero;
                 keypoints[idx].state = 0;
             }
             else
             {
-                keypoints[idx].x = loc.x;
-                keypoints[idx].y = loc.y;
+                keypoints[idx].location = new Vector2(loc.x, loc.y);
                 keypoints[idx].state = 2;
             }
         }
@@ -529,7 +682,7 @@ namespace UnityEngine.Perception.GroundTruth
             return "unset";
         }
 
-        Keypoint? GetKeypointForJoint(KeypointEntry entry, int joint)
+        Keypoint? GetKeypointForJoint(Annotation.Entry entry, int joint)
         {
             if (joint < 0 || joint >= entry.keypoints.Length) return null;
             return entry.keypoints[joint];
@@ -555,18 +708,18 @@ namespace UnityEngine.Perception.GroundTruth
 
                     if (joint1 != null && joint1.Value.state == 2 && joint2 != null && joint2.Value.state == 2)
                     {
-                        VisualizationHelper.DrawLine(joint1.Value.x, joint1.Value.y, joint2.Value.x, joint2.Value.y, bone.color, 8, skeletonTexture);
+                        VisualizationHelper.DrawLine(joint1.Value.location, joint2.Value.location, bone.color, 8, skeletonTexture);
                     }
                 }
 
                 foreach (var keypoint in entry.keypoints)
                 {
                     if (keypoint.state == 2)
-                        VisualizationHelper.DrawPoint(keypoint.x, keypoint.y, activeTemplate.keypoints[keypoint.index].color, 8, jointTexture);
+                        VisualizationHelper.DrawPoint(keypoint.location.x, keypoint.location.y, activeTemplate.keypoints[keypoint.index].color, 8, jointTexture);
                 }
             }
         }
-
+#if false
         // ReSharper disable InconsistentNaming
         // ReSharper disable NotAccessedField.Local
         [Serializable]
@@ -597,25 +750,28 @@ namespace UnityEngine.Perception.GroundTruth
         }
         // ReSharper restore InconsistentNaming
         // ReSharper restore NotAccessedField.Local
-
-        KeypointJson[] TemplateToJson(KeypointTemplate input, IdLabelConfig labelConfig)
+#endif
+        // TODO rename this method
+        Definition.Entry [] TemplateToJson(KeypointTemplate input, IdLabelConfig labelConfig)
         {
-            var jsons = new KeypointJson[labelConfig.labelEntries.Count];
+            var jsons = new Definition.Entry[labelConfig.labelEntries.Count];
             var idx = 0;
 
             foreach (var cfg in labelConfig.labelEntries)
             {
-                var json = new KeypointJson();
-                json.label_id = cfg.id;
-                json.label_name = cfg.label;
-                json.template_id = input.templateID;
-                json.template_name = input.templateName;
-                json.key_points = new JointJson[input.keypoints.Length];
-                json.skeleton = new SkeletonJson[input.skeleton.Length];
+                var json = new Definition.Entry
+                {
+                    labelId = cfg.id,
+                    labelName = cfg.label,
+                    templateId = input.templateID,
+                    templateName = input.templateName,
+                    keyPoints = new Definition.JointDefinition[input.keypoints.Length],
+                    skeleton = new Definition.SkeletonDefinition[input.skeleton.Length]
+                };
 
                 for (var i = 0; i < input.keypoints.Length; i++)
                 {
-                    json.key_points[i] = new JointJson
+                    json.keyPoints[i] = new Definition.JointDefinition
                     {
                         label = input.keypoints[i].label,
                         index = i,
@@ -625,7 +781,7 @@ namespace UnityEngine.Perception.GroundTruth
 
                 for (var i = 0; i < input.skeleton.Length; i++)
                 {
-                    json.skeleton[i] = new SkeletonJson()
+                    json.skeleton[i] = new Definition.SkeletonDefinition
                     {
                         joint1 = input.skeleton[i].joint1,
                         joint2 = input.skeleton[i].joint2,

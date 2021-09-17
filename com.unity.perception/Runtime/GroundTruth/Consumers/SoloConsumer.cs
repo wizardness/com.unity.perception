@@ -188,6 +188,9 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                     case BoundingBox3DLabeler.BoundingBoxAnnotation bbox:
                         annotations.Add(ConvertAnnotation(frame, bbox));
                         break;
+                    case KeypointLabeler.Annotation keypoint:
+                        annotations.Add(ConvertAnnotation(frame, keypoint));
+                        break;
                 }
             }
 
@@ -227,6 +230,40 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 ["annotationId"] = metric.annotationId,
                 ["description"] = metric.description
             };
+        }
+
+        static JToken ConvertAnnotation(Frame frame, KeypointLabeler.Annotation keypoint)
+        {
+            var outBox = ToAnnotationHeader(frame, keypoint);
+            var values = new JArray();
+
+            foreach (var kp in keypoint.entries)
+            {
+                var keypoints = new JArray();
+
+                foreach (var k in kp.keypoints)
+                {
+                    keypoints.Add(new JObject
+                    {
+                        ["index"] = k.index,
+                        ["location"] = FromVector2(k.location),
+                        ["state"] = k.state
+                    });
+                }
+
+                values.Add(new JObject
+                {
+                    ["instance_id"] = kp.instanceId,
+                    ["label_id"] = kp.labelId,
+                    ["template_guid"] = kp.templateGuid,
+                    ["pose"] = kp.pose,
+                    ["keypoints"] = keypoints
+                });
+            }
+
+            outBox["values"] = values;
+
+            return outBox;
         }
 
         static JToken ConvertAnnotation(Frame frame, BoundingBox3DLabeler.BoundingBoxAnnotation bbox)
