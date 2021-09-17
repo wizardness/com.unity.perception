@@ -72,12 +72,19 @@ namespace UnityEngine.Perception.GroundTruth
             mpb.SetVector(k_SegmentationIdProperty, (Color)color);
 
             Texture mainTex = null;
+            var mainTexSt = new Vector4(1, 1, 0, 0);
 
             if (renderer && renderer.material)
             {
                 if (renderer.material.HasProperty("_MainTex"))
                 {
-                    mainTex = renderer.material.GetTexture("_MainTex");
+                    var mat = renderer.material;
+                    mainTex = mat.GetTexture("_MainTex");
+                    mainTexSt.x = mat.mainTextureScale.x;
+                    mainTexSt.y = mat.mainTextureScale.y;
+                    mainTexSt.z = mat.mainTextureOffset.x;
+                    mainTexSt.w = mat.mainTextureOffset.y;
+
                     // if (maintex)
                     //     mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
                 }
@@ -95,10 +102,14 @@ namespace UnityEngine.Perception.GroundTruth
                         if (mainTex == null)
                             Debug.LogError("No texture found on object");
                         else
+                        {
                             mpb.SetTexture("_MainTex", mainTex);
+                        }
                     }
                     else
                         mpb.SetTexture("_MainTex", segBeh.segmentationMask);
+
+                    mpb.SetVector("_MainTex_ST", mainTexSt);
                 }
                 //mpb.SetFloat("_TransparencyThreshold", segBeh.opacityThreshold);
             }

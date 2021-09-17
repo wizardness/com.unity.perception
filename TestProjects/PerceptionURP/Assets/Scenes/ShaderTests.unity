@@ -1318,7 +1318,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   m_LocalRotation: {x: 0.18995228, y: 0, z: 0, w: 0.98179334}
-  m_LocalPosition: {x: 76.2, y: 135.9, z: -262.6}
+  m_LocalPosition: {x: 76.2, y: 127.5, z: -241.6}
   m_LocalScale: {x: 36.249973, y: 36.249973, z: 36.249973}
   m_Children: []
   m_Father: {fileID: 0}
@@ -2206,7 +2206,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useSegmentationMask: 1
   segmentationMask: {fileID: 2800000, guid: 474275722ca6a4570bf9773fed7b079d, type: 3}
-  useMainTextureAsSegmask: 0
+  useMainTextureAsSegmask: 1
 --- !u!65 &1762131275
 BoxCollider:
   m_ObjectHideFlags: 0
