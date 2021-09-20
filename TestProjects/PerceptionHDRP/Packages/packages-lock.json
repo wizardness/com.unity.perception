@@ -116,6 +116,13 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.unity.scripting.python": {
+      "version": "4.0.0-exp.5",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
     "com.unity.shadergraph": {
       "version": "7.3.1",
       "depth": 1,
