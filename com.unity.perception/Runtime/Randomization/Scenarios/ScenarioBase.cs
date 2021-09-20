@@ -351,6 +351,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                 return;
             }
 
+            var randomizersStartedThisIteration = new List<Randomizer>();
             // Perform new iteration tasks
             if (currentIterationFrame == 0)
             {
@@ -366,8 +367,16 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                     foreach (var randomizer in activeRandomizers)
                     {
                         randomizer.IterationStart();
+                        randomizersStartedThisIteration.Add(randomizer);
                         if (m_ShouldRestartIteration)
+                        {
+                            foreach (var rand in randomizersStartedThisIteration)
+                            {
+                                rand.IterationEnd();
+                            }
+                            randomizersStartedThisIteration.Clear();
                             break;
+                        }
 
                         if (m_ShouldDelayIteration)
                         {
