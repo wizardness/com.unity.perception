@@ -1,208 +1,71 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Simulation;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.Consumers;
 using UnityEngine.Perception.GroundTruth.DataModel;
-using UnityEngine.Rendering;
 
 #pragma warning disable 649
 namespace UnityEngine.Perception.GroundTruth
 {
-#if UNITY_EDITOR
-    [InitializeOnLoad]
-    public static class EditModePlayStateController
-    {
-        public static bool s_Done = false;
-        public static bool Done
-        {
-            get => s_Done;
-            set
-            {
-                if (value)
-                {
-                    s_Done = true;
-                    EditorApplication.isPlaying = false;
-                }
-            }
-        }
-
-        static bool toggle = true;
-
-        static EditModePlayStateController()
-        {
-            EditorApplication.playModeStateChanged += state =>
-            {
-                if (state == PlayModeStateChange.ExitingPlayMode)
-                {
-                    EditorApplication.isPlaying = toggle;
-                    toggle = !toggle;
-
-//                    EditorApplication.isPlaying = !Done;
-                }
-            };
-        }
-    }
-#endif
-
     /// <summary>
     /// Global manager for frame scheduling and output capture for simulations.
     /// Data capture follows the schema defined in *TODO: Expose schema publicly*
     /// </summary>
     public class DatasetCapture
     {
-#if false
-        public static DatasetCapture Instance { get; private set; }
-#else
         static DatasetCapture s_Instance;
-        public static DatasetCapture Instance
+
+        List<SimulationState> m_Simulations = new List<SimulationState>();
+
+        public static DatasetCapture Instance => s_Instance ?? (s_Instance = new DatasetCapture());
+
+        //SimulationState m_SimulationState = null;
+        //List<SimulationState> m_ShuttingDownSimulationStates = new List<SimulationState>();
+
+        Type m_ActiveConsumerType = typeof(SoloConsumer);
+
+        bool CanBeShutdown()
         {
-            get { return s_Instance ?? (s_Instance = new DatasetCapture()); }
+            if (m_ReadyToShutdown)
+                Debug.Log("After ready to be shutdown");
+
+            if (m_ReadyToShutdown && m_Simulations.All(s => s.IsNotRunning()))
+            {
+                Debug.Log("we here");
+            }
+
+            return m_ReadyToShutdown && m_Simulations.All(s => s.IsNotRunning());
         }
-#endif
-        ConsumerEndpoint m_ActiveConsumer;
-        SimulationState m_SimulationState;
 
-        List<ConsumerEndpoint> m_Endpoints = new List<ConsumerEndpoint>();
-
-        public IEnumerable<ConsumerEndpoint> consumerEndpoints => m_Endpoints.AsReadOnly();
-
-        public bool ReadyToShutdown => m_ReadyToShutdown && !m_OldSimStates.Any();
-
-        class ShutdownCondition : ICondition
+        class AllCapturesCompleteShutdownCondition : ICondition
         {
             public bool HasConditionBeenMet()
             {
-                if (DatasetCapture.Instance.ReadyToShutdown)
-                {
-                    Debug.Log("Triggered dc ready");
-                }
+                if (Instance.m_ReadyToShutdown)
+                    Debug.Log("In here, but I doubt it");
 
-                return DatasetCapture.Instance.ReadyToShutdown;
+                return Instance.CanBeShutdown();
             }
         }
 
         DatasetCapture()
         {
-            Manager.Instance.ShutdownCondition = new ShutdownCondition();
-
-            //Manager.Instance.ShutdownCondition = new ShutdownCondition();
+            Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
             Manager.Instance.ShutdownNotification += OnApplicationShutdown;
         }
-
-        List<SimulationState> m_OldSimStates = new List<SimulationState>();
 
         internal SimulationState simulationState
         {
             get
             {
-                if (m_SimulationState == null)
-                {
-                    m_SimulationState = CreateSimulationData();
-                    m_SimulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
-                }
-
-                return m_SimulationState;
+                if (!m_Simulations.Any()) m_Simulations.Add(CreateSimulationData());
+                return m_Simulations.Last();
             }
-            private set { m_SimulationState = value; }
+            private set => m_Simulations.Add(value);
         }
 
-        public bool RegisterConsumer(ConsumerEndpoint endpoint)
-        {
-            // TODO error detection about active consumer already set...
-            m_ActiveConsumer = endpoint;
-            return true;
-        }
-
-        public bool UnregisterConsumer(ConsumerEndpoint endpoint)
-        {
-            m_ActiveConsumer = null;
-            return true;
-        }
-
-        public ConsumerEndpoint ActiveConsumer => m_ActiveConsumer;
-
-        internal void AddConsumerEndpoint(ConsumerEndpoint endpoint)
-        {
-            m_ActiveConsumer = endpoint;
-        }
-
-        internal void RemoveConsumerEndpointAt(int index)
-        {
-            Debug.Log("RemoveConsumerEndpointAt has not been implemented yet");
-        }
-
-        internal ConsumerEndpoint GetConsumerEndpoint(int index)
-        {
-            Debug.Log("RemoveConsumerEndpointAt has not been implemented yet");
-            return m_ActiveConsumer;
-        }
-
-        internal void InsertConsumerEndpoint(int index, ConsumerEndpoint endpoint)
-        {
-            Debug.Log("InsertConsumerEndpoint has not been implemented yet");
-        }
-
-        internal ConsumerEndpoint CreateConsumerEndpoint(Type endpointType)
-        {
-            if (!endpointType.IsSubclassOf(typeof(ConsumerEndpoint)))
-                throw new InvalidOperationException($"Cannot add non-endpoint type {endpointType.Name} to consumer endpoint list");
-            var newEndpoint = (ConsumerEndpoint)Activator.CreateInstance(endpointType);
-            AddConsumerEndpoint(newEndpoint);
-            return newEndpoint;
-        }
-
-#if false
-        void Awake()
-        {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(this);
-                Debug.LogError($"The simulation started with more than one instance of DatasetCapture, destroying this one");
-            }
-            else
-            {
-                Instance = this;
-
-#if UNITY_EDITOR
-                EditorApplication.playModeStateChanged += (x) =>
-                {
-                    Debug.Log("On playmode changed");
-                };
-
-                Manager.Instance.ShutdownNotification += OnApplicationShutdown;
-
-                EditorApplication.wantsToQuit += () =>
-                {
-                    if (m_HijackQuit)
-                    {
-//                        StartCoroutine(ResetSimulation());
-                        m_HijackQuit = false;
-                        return false;
-                    }
-
-                    return true;
-                };
-
-#else
-                Application.wantsToQuit += () =>
-                {
-                    if (m_HijackQuit)
-                    {
-                        StartCoroutine(ResetSimulation());
-                        m_HijackQuit = false;
-                        return false;
-                    }
-
-                    return true;
-                };
-#endif
-            }
-        }
-#endif
         /// <summary>
         /// The json metadata schema version the DatasetCapture's output conforms to.
         /// </summary>
@@ -239,7 +102,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         SimulationState CreateSimulationData()
         {
-            return new SimulationState();
+            return new SimulationState(typeof(SoloConsumer));
         }
 
         [RuntimeInitializeOnLoadMethod]
@@ -248,90 +111,31 @@ namespace UnityEngine.Perception.GroundTruth
             Manager.Instance.ShutdownNotification += OnApplicationShutdown;
         }
 
-        void OnApplicationQuit()
-        {
-
-            ResetSimulation();
-//            StartCoroutine(ResetSimulation());
-        }
-
-        void OnDisable()
-        {
-
-//            StartCoroutine(ResetSimulation());
-        }
-
-        void OnDestroy()
-        {
-            Debug.Log("ON Destroy");
-        }
-
         bool m_ReadyToShutdown = false;
 
         void OnApplicationShutdown()
         {
-            Debug.Log("On application Quit");
             ResetSimulation();
             m_ReadyToShutdown = true;
-
-//            Manager.Instance.ShutdownAfterFrames(5);
-
-//            Manager.Instance.Shutdown();
-//            StartCoroutine(ResetSimulation());
         }
 
-#if false
-        /// <summary>
-        /// Stop the current simulation and start a new one. All pending data is written to disk before returning.
-        /// </summary>
-        public IEnumerator ResetSimulation()
-        {
-            //this order ensures that exceptions thrown by End() do not prevent the state from being reset
-            SimulationEnding?.Invoke();
-            var oldSimulationState = simulationState;
-            simulationState = CreateSimulationData();
-            simulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
-            yield return StartCoroutine(oldSimulationState.End());
-            if (!m_HijackQuit) Application.Quit();
-        }
-
-#else
         public void Update()
         {
-            simulationState.Update();
-
-            List<SimulationState> toClear = new List<SimulationState>();
-            foreach (var oldie in m_OldSimStates)
+            foreach (var simulation in m_Simulations)
             {
-                oldie.TryToClearOut();
+                simulation.Update();
             }
 
-            m_OldSimStates.RemoveAll(oldie => oldie.ReadyToShutdown);
-
-            if (m_ReadyToShutdown)
-            {
-                Debug.Log("stop here");
-            }
-
-            EditModePlayStateController.Done = m_ReadyToShutdown && !m_OldSimStates.Any();
+            m_Simulations.RemoveAll(sim => sim.ExecutionState == SimulationState.ExecutionStateType.Complete);
         }
 
         public void ResetSimulation()
         {
-//            Manager.Instance.Shutdown();
-
             SimulationEnding?.Invoke();
-            var oldState = simulationState;
+            simulationState.End();
             simulationState = CreateSimulationData();
-            simulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
-
-            m_OldSimStates.Add(oldState);
-            oldState.End();
-
             m_ReadyToShutdown = true;
         }
-
-#endif
     }
 
     public enum FutureType

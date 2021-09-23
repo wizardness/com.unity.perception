@@ -6,6 +6,7 @@ using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.GroundTruth
 {
+#if false
     public partial class SimulationState
     {
         Dictionary<int, int> m_SequenceMap = new Dictionary<int, int>();
@@ -124,6 +125,21 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             m_SerializeCapturesSampler.End();
+
+            if (ReadyToShutdown)
+            {
+                var metadata = new CompletionMetadata()
+                {
+                    unityVersion = m_SimulationMetadata.unityVersion,
+                    perceptionVersion = m_SimulationMetadata.perceptionVersion,
+                    renderPipeline = m_SimulationMetadata.renderPipeline,
+                    totalFrames = m_TotalFrames
+                };
+
+                consumerEndpoint.OnSimulationCompleted(metadata);
+            }
+
+
             m_CaptureFileIndex++;
         }
 
@@ -133,4 +149,5 @@ namespace UnityEngine.Perception.GroundTruth
             public SimulationState SimulationState;
         }
     }
+#endif
 }

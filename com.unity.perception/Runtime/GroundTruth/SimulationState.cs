@@ -11,11 +11,30 @@ using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.GroundTruth
 {
-    public partial class SimulationState
+    public class SimulationState
     {
+        public enum ExecutionStateType
+        {
+            NotStarted,
+            Running,
+            ShuttingDown,
+            Complete
+        }
+
+        internal bool IsCurrentlyRunning()
+        {
+            return ExecutionState == ExecutionStateType.Running || ExecutionState == ExecutionStateType.ShuttingDown;
+        }
+
+        internal bool IsNotRunning()
+        {
+            return ExecutionState == ExecutionStateType.NotStarted || ExecutionState == ExecutionStateType.Complete;
+        }
+
+        internal ExecutionStateType ExecutionState { get; private set; } = ExecutionStateType.NotStarted;
+
         HashSet<SensorHandle> m_ActiveSensors = new HashSet<SensorHandle>();
         Dictionary<SensorHandle, SensorData> m_Sensors = new Dictionary<SensorHandle, SensorData>();
-//        ConsumerEndpoint _Consumer;
 
         internal ConsumerEndpoint consumerEndpoint { get; set; }
 
@@ -32,8 +51,6 @@ namespace UnityEngine.Perception.GroundTruth
         int m_TotalFrames = 0;
         int m_Step = -1;
 
-        bool m_HasStarted;
-        int m_CaptureFileIndex;
         List<AdditionalInfoTypeData> m_AdditionalInfoTypeData = new List<AdditionalInfoTypeData>();
 
         Dictionary<PendingFrameId, int> m_PendingIdToFrameMap = new Dictionary<PendingFrameId, int>();
@@ -50,17 +67,21 @@ namespace UnityEngine.Perception.GroundTruth
 
         public bool IsValid(Guid guid) => true; // TODO obvs we need to do this for realz
 
-        public bool IsRunning { get; private set; }
+//        public bool IsRunning { get; private set; }
 
         //A sensor will be triggered if sequenceTime is within includeThreshold seconds of the next trigger
         const float k_SimulationTimingAccuracy = 0.01f;
 
-        public SimulationState()
+        public SimulationState(Type endpointType)
         {
-            IsRunning = true;
+            ExecutionState = ExecutionStateType.NotStarted;
+
+            if (!endpointType.IsSubclassOf(typeof(ConsumerEndpoint)))
+                throw new InvalidOperationException($"Cannot add non-endpoint type {endpointType.Name} to consumer endpoint list");
+            consumerEndpoint = (ConsumerEndpoint)Activator.CreateInstance(endpointType);
         }
 
-        public bool ReadyToShutdown => !m_PendingFrames.Any();
+        bool ReadyToShutdown => !m_PendingFrames.Any();
 
         public interface IPendingId
         {
@@ -557,7 +578,7 @@ namespace UnityEngine.Perception.GroundTruth
             get
             {
                 //TODO: Can this be replaced with Time.time - sequenceTimeStart?
-                if (!m_HasStarted)
+                if (ExecutionState != ExecutionStateType.Running)
                     return 0;
 
                 EnsureSequenceTimingsUpdated();
@@ -574,7 +595,7 @@ namespace UnityEngine.Perception.GroundTruth
             get
             {
                 //TODO: Can this be replaced with Time.time - sequenceTimeStart?
-                if (!m_HasStarted)
+                if (ExecutionState != ExecutionStateType.Running)
                     return 0;
 
                 EnsureSequenceTimingsUpdated();
@@ -584,7 +605,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         void EnsureSequenceTimingsUpdated()
         {
-            if (!m_HasStarted)
+            if (ExecutionState != ExecutionStateType.Running)
             {
                 ResetTimings();
             }
@@ -741,28 +762,59 @@ namespace UnityEngine.Perception.GroundTruth
         }
 
         SimulationMetadata m_SimulationMetadata;
+#if false
+        internal void TryToClearOut()
+        {
+            if (ReadyToShutdown) return;
 
+            WritePendingCaptures(true, true);
+        }
+#endif
         public void Update()
         {
             if (m_ActiveSensors.Count == 0)
                 return;
 
-            if (!m_HasStarted)
+            if (ExecutionState == ExecutionStateType.NotStarted)
             {
-                m_SimulationMetadata = new SimulationMetadata()
-                {
-                    unityVersion = Application.unityVersion,
-                    perceptionVersion = DatasetCapture.PerceptionVersion,
-                };
-
-                consumerEndpoint.OnSimulationStarted(m_SimulationMetadata);
-
-                //simulation starts now
-                m_FrameCountLastUpdatedSequenceTime = Time.frameCount;
-                m_LastTimeScale = Time.timeScale;
-                m_HasStarted = true;
+                UpdateNotStarted();
             }
 
+            if (ExecutionState == ExecutionStateType.Running)
+            {
+                UpdateRunning();
+            }
+
+            if (ExecutionState == ExecutionStateType.ShuttingDown)
+            {
+                UpdateShuttdingDown();
+            }
+
+            if (ExecutionState == ExecutionStateType.Complete)
+            {
+                UpdateComplete();
+            }
+        }
+
+        void UpdateNotStarted()
+        {
+            m_SimulationMetadata = new SimulationMetadata()
+            {
+                unityVersion = Application.unityVersion,
+                perceptionVersion = DatasetCapture.PerceptionVersion,
+            };
+
+            consumerEndpoint.OnSimulationStarted(m_SimulationMetadata);
+
+            //simulation starts now
+            m_FrameCountLastUpdatedSequenceTime = Time.frameCount;
+            m_LastTimeScale = Time.timeScale;
+
+            ExecutionState = ExecutionStateType.Running;
+        }
+
+        void UpdateRunning()
+        {
             EnsureSequenceTimingsUpdated();
 
             //update the active sensors sequenceTimeNextCapture and lastCaptureFrameCount
@@ -841,9 +893,81 @@ namespace UnityEngine.Perception.GroundTruth
 
             WritePendingCaptures();
 
-//            WritePendingMetrics();
-
             Time.captureDeltaTime = nextFrameDt;
+        }
+
+        void UpdateShuttdingDown()
+        {
+            if (_Ids.Count == 0)
+            {
+                ExecutionState = ExecutionStateType.Complete;
+                return;
+            }
+
+            WritePendingCaptures(true, true);
+#if false
+            if (m_AdditionalInfoTypeData.Any())
+            {
+                List<IdLabelConfig.LabelEntrySpec> labels = new List<IdLabelConfig.LabelEntrySpec>();
+
+                foreach (var infoTypeData in m_AdditionalInfoTypeData)
+                {
+                    if (infoTypeData.specValues == null) continue;
+
+                    foreach (var spec in infoTypeData.specValues)
+                    {
+                        if (spec is IdLabelConfig.LabelEntrySpec entrySpec)
+                        {
+                            labels.Add(entrySpec);
+                        }
+                    }
+
+//                    Debug.Log($"adt: {infoTypeData}");
+
+                }
+            }
+
+//            WriteReferences();
+#endif
+            Time.captureDeltaTime = 0;
+
+            OnComplete();
+        }
+
+        void OnComplete()
+        {
+            if (_Ids.Count == 0)
+            {
+                return;
+            }
+
+            if (ReadyToShutdown)
+            {
+                var metadata = new CompletionMetadata()
+                {
+                    unityVersion = m_SimulationMetadata.unityVersion,
+                    perceptionVersion = m_SimulationMetadata.perceptionVersion,
+                    renderPipeline = m_SimulationMetadata.renderPipeline,
+                    totalFrames = m_TotalFrames
+                };
+
+                consumerEndpoint.OnSimulationCompleted(metadata);
+
+                ExecutionState = ExecutionStateType.Complete;
+
+                VerifyNoMorePendingFrames();
+            }
+        }
+
+        void UpdateComplete()
+        {
+            VerifyNoMorePendingFrames();
+        }
+
+        void VerifyNoMorePendingFrames()
+        {
+            if (m_PendingFrames.Count > 0)
+                Debug.LogError($"Simulation ended with pending annotations: {string.Join(", ", m_PendingFrames.Select(c => $"id:{c.Key}"))}");
         }
 
         public void SetNextCaptureTimeToNowForSensor(SensorHandle sensorHandle)
@@ -928,71 +1052,9 @@ namespace UnityEngine.Perception.GroundTruth
             return m_PendingFrames.Count > 0;
         }
 
-        internal void TryToClearOut()
-        {
-            if (ReadyToShutdown) return;
-
-            WritePendingCaptures(true, true);
-
-            if (ReadyToShutdown)
-            {
-                var metadata = new CompletionMetadata()
-                {
-                    unityVersion = m_SimulationMetadata.unityVersion,
-                    perceptionVersion = m_SimulationMetadata.perceptionVersion,
-                    renderPipeline = m_SimulationMetadata.renderPipeline,
-                    totalFrames = m_TotalFrames
-                };
-
-                consumerEndpoint.OnSimulationCompleted(metadata);
-            }
-        }
-
         public void End()
         {
-            if (_Ids.Count == 0)
-                return;
-
-
-//            while (m_PendingFrames.Count > 0)
-//            {
-                WritePendingCaptures(true, true);
-//            }
-
-            if (m_PendingFrames.Count > 0)
-                Debug.LogError($"Simulation ended with {m_PendingFrames.Count} pending annotations, final one is: ({m_PendingFrames.Last().Key.Sequence},{m_PendingFrames.Last().Key.Step})");
-
-#if false
-            WritePendingMetrics(true);
-            if (m_PendingMetrics.Count > 0)
-                Debug.LogError($"Simulation ended with pending metrics: {string.Join(", ", m_PendingMetrics.Select(c => $"id:{c.MetricId} step:{c.Step}"))}");
-#endif
-            if (m_AdditionalInfoTypeData.Any())
-            {
-                List<IdLabelConfig.LabelEntrySpec> labels = new List<IdLabelConfig.LabelEntrySpec>();
-
-                foreach (var infoTypeData in m_AdditionalInfoTypeData)
-                {
-                    if (infoTypeData.specValues == null) continue;
-
-                    foreach (var spec in infoTypeData.specValues)
-                    {
-                        if (spec is IdLabelConfig.LabelEntrySpec entrySpec)
-                        {
-                            labels.Add(entrySpec);
-                        }
-                    }
-
-//                    Debug.Log($"adt: {infoTypeData}");
-
-                }
-            }
-
-//            WriteReferences();
-            Time.captureDeltaTime = 0;
-            IsRunning = false;
-
-
+            ExecutionState = ExecutionStateType.ShuttingDown;
         }
 #endif
         public void RegisterAnnotationDefinition(AnnotationDefinition definition)
@@ -1113,7 +1175,6 @@ namespace UnityEngine.Perception.GroundTruth
             return m_PendingFrames[id];
         }
 
-
         bool ReportAsyncResultGeneric<T>(IAsyncFuture<T> asyncFuture, object result) where T : IPendingId
         {
             if (!asyncFuture.IsPending()) return false;
@@ -1162,6 +1223,130 @@ namespace UnityEngine.Perception.GroundTruth
 
             pendingSensor.Metrics[pendingId] = metric;
             return pendingId;
+        }
+
+        Dictionary<int, int> m_SequenceMap = new Dictionary<int, int>();
+
+        Sensor ToSensor(PendingFrame pendingFrame, SimulationState simulationState, int captureFileIndex)
+        {
+            var sensor = new RgbSensor
+            {
+                Id = "camera",
+                sensorType = "camera",
+                description = "this is the description of the sensor",
+                position = Vector3.zero,
+                rotation = Vector3.zero,
+                velocity = Vector3.zero,
+                acceleration = Vector3.zero,
+                imageFormat = "png",
+                dimension = Vector2.zero,
+                buffer = null
+            };
+
+            return sensor;
+        }
+
+        // TODO rename this to 'WritePendingFrames'
+        void WritePendingCaptures(bool flush = false, bool writeCapturesFromThisFrame = false)
+        {
+            m_SerializeCapturesSampler.Begin();
+
+            var pendingFramesToWrite = new List<KeyValuePair<PendingFrameId,PendingFrame>>(m_PendingFrames.Count);
+            var currentFrame = Time.frameCount;
+
+            foreach (var frame in m_PendingFrames)
+            {
+                var recordedFrame = m_PendingIdToFrameMap[frame.Value.PendingId];
+                if ((writeCapturesFromThisFrame || recordedFrame < currentFrame) &&
+                    frame.Value.IsReadyToReport())
+                {
+                    pendingFramesToWrite.Add(frame);
+                }
+            }
+
+            foreach (var pf in pendingFramesToWrite)
+            {
+                m_PendingFrames.Remove(pf.Key);
+            }
+
+            IEnumerable<Sensor> ConvertToSensors(PendingFrame frame, SimulationState simulationState)
+            {
+                return frame.sensors.Values.Where(s => s.IsReadyToReport()).Select(s => s.ToSensor());
+            }
+
+            Frame ConvertToFrameData(PendingFrame pendingFrame, SimulationState simState)
+            {
+                var frameId = m_PendingIdToFrameMap[pendingFrame.PendingId];
+                var frame = new Frame(frameId, pendingFrame.PendingId.Sequence, pendingFrame.PendingId.Step);
+
+                frame.sensors = ConvertToSensors(pendingFrame, simState);
+#if false
+                foreach (var annotation in pendingFrame.annotations.Values)
+                {
+                    frame.annotations.Add(annotation);
+                }
+
+                foreach (var metric in pendingFrame.metrics.Values)
+                {
+                    frame.metrics.Add(metric);
+                }
+#endif
+                return frame;
+            }
+
+            void Write(List<KeyValuePair<PendingFrameId, PendingFrame>> frames, SimulationState simulationState)
+            {
+#if true
+                // TODO this needs to be done properly, we need to wait on all of the frames to come back so we
+                // can report them, right now we are just going to jam up this thread waiting for them, also could
+                // result in an endless loop if the frame never comes back
+                while (frames.Any())
+                {
+                    var frame = frames.First();
+                    if (frame.Value.IsReadyToReport())
+                    {
+                        frames.Remove(frame);
+                        var converted = ConvertToFrameData(frame.Value, simulationState);
+                        m_TotalFrames++;
+                        consumerEndpoint.OnFrameGenerated(converted);
+                    }
+                }
+#else
+                foreach (var pendingFrame in frames)
+                {
+                    var frame = ConvertToFrameData(pendingFrame.Value, simulationState);
+                    GetActiveConsumer()?.OnFrameGenerated(frame);
+                }
+#endif
+            }
+
+            if (flush)
+            {
+                Write(pendingFramesToWrite, this);
+            }
+            else
+            {
+                var req = Manager.Instance.CreateRequest<AsyncRequest<WritePendingCaptureRequestData>>();
+                req.data = new WritePendingCaptureRequestData()
+                {
+                    PendingFrames = pendingFramesToWrite,
+                    SimulationState = this
+                };
+                req.Enqueue(r =>
+                {
+                    Write(r.data.PendingFrames, r.data.SimulationState);
+                    return AsyncRequest.Result.Completed;
+                });
+                req.Execute(AsyncRequest.ExecutionContext.JobSystem);
+            }
+
+            m_SerializeCapturesSampler.End();
+        }
+
+        struct WritePendingCaptureRequestData
+        {
+            public List<KeyValuePair<PendingFrameId, PendingFrame>> PendingFrames;
+            public SimulationState SimulationState;
         }
     }
 }
