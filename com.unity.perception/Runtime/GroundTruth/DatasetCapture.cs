@@ -1,21 +1,161 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using Unity.Simulation;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.Perception.GroundTruth.Consumers;
 using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Rendering;
 
 #pragma warning disable 649
 namespace UnityEngine.Perception.GroundTruth
 {
+#if UNITY_EDITOR
+    [InitializeOnLoad]
+    public static class EditModePlayStateController
+    {
+        public static bool s_Done = false;
+        public static bool Done
+        {
+            get => s_Done;
+            set
+            {
+                if (value)
+                {
+                    s_Done = true;
+                    EditorApplication.isPlaying = false;
+                }
+            }
+        }
+
+        static bool toggle = true;
+
+        static EditModePlayStateController()
+        {
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state == PlayModeStateChange.ExitingPlayMode)
+                {
+                    EditorApplication.isPlaying = toggle;
+                    toggle = !toggle;
+
+//                    EditorApplication.isPlaying = !Done;
+                }
+            };
+        }
+    }
+#endif
+
     /// <summary>
     /// Global manager for frame scheduling and output capture for simulations.
     /// Data capture follows the schema defined in *TODO: Expose schema publicly*
     /// </summary>
-    public class DatasetCapture : MonoBehaviour
+    public class DatasetCapture
     {
-        public static DatasetCapture Instance { get; protected set; }
-        public ConsumerEndpoint activeConsumer;
+#if false
+        public static DatasetCapture Instance { get; private set; }
+#else
+        static DatasetCapture s_Instance;
+        public static DatasetCapture Instance
+        {
+            get { return s_Instance ?? (s_Instance = new DatasetCapture()); }
+        }
+#endif
+        ConsumerEndpoint m_ActiveConsumer;
         SimulationState m_SimulationState;
 
+        List<ConsumerEndpoint> m_Endpoints = new List<ConsumerEndpoint>();
+
+        public IEnumerable<ConsumerEndpoint> consumerEndpoints => m_Endpoints.AsReadOnly();
+
+        public bool ReadyToShutdown => m_ReadyToShutdown && !m_OldSimStates.Any();
+
+        class ShutdownCondition : ICondition
+        {
+            public bool HasConditionBeenMet()
+            {
+                if (DatasetCapture.Instance.ReadyToShutdown)
+                {
+                    Debug.Log("Triggered dc ready");
+                }
+
+                return DatasetCapture.Instance.ReadyToShutdown;
+            }
+        }
+
+        DatasetCapture()
+        {
+            Manager.Instance.ShutdownCondition = new ShutdownCondition();
+
+            //Manager.Instance.ShutdownCondition = new ShutdownCondition();
+            Manager.Instance.ShutdownNotification += OnApplicationShutdown;
+        }
+
+        List<SimulationState> m_OldSimStates = new List<SimulationState>();
+
+        internal SimulationState simulationState
+        {
+            get
+            {
+                if (m_SimulationState == null)
+                {
+                    m_SimulationState = CreateSimulationData();
+                    m_SimulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
+                }
+
+                return m_SimulationState;
+            }
+            private set { m_SimulationState = value; }
+        }
+
+        public bool RegisterConsumer(ConsumerEndpoint endpoint)
+        {
+            // TODO error detection about active consumer already set...
+            m_ActiveConsumer = endpoint;
+            return true;
+        }
+
+        public bool UnregisterConsumer(ConsumerEndpoint endpoint)
+        {
+            m_ActiveConsumer = null;
+            return true;
+        }
+
+        public ConsumerEndpoint ActiveConsumer => m_ActiveConsumer;
+
+        internal void AddConsumerEndpoint(ConsumerEndpoint endpoint)
+        {
+            m_ActiveConsumer = endpoint;
+        }
+
+        internal void RemoveConsumerEndpointAt(int index)
+        {
+            Debug.Log("RemoveConsumerEndpointAt has not been implemented yet");
+        }
+
+        internal ConsumerEndpoint GetConsumerEndpoint(int index)
+        {
+            Debug.Log("RemoveConsumerEndpointAt has not been implemented yet");
+            return m_ActiveConsumer;
+        }
+
+        internal void InsertConsumerEndpoint(int index, ConsumerEndpoint endpoint)
+        {
+            Debug.Log("InsertConsumerEndpoint has not been implemented yet");
+        }
+
+        internal ConsumerEndpoint CreateConsumerEndpoint(Type endpointType)
+        {
+            if (!endpointType.IsSubclassOf(typeof(ConsumerEndpoint)))
+                throw new InvalidOperationException($"Cannot add non-endpoint type {endpointType.Name} to consumer endpoint list");
+            var newEndpoint = (ConsumerEndpoint)Activator.CreateInstance(endpointType);
+            AddConsumerEndpoint(newEndpoint);
+            return newEndpoint;
+        }
+
+#if false
         void Awake()
         {
             if (Instance != null && Instance != this)
@@ -26,24 +166,54 @@ namespace UnityEngine.Perception.GroundTruth
             else
             {
                 Instance = this;
+
+#if UNITY_EDITOR
+                EditorApplication.playModeStateChanged += (x) =>
+                {
+                    Debug.Log("On playmode changed");
+                };
+
+                Manager.Instance.ShutdownNotification += OnApplicationShutdown;
+
+                EditorApplication.wantsToQuit += () =>
+                {
+                    if (m_HijackQuit)
+                    {
+//                        StartCoroutine(ResetSimulation());
+                        m_HijackQuit = false;
+                        return false;
+                    }
+
+                    return true;
+                };
+
+#else
+                Application.wantsToQuit += () =>
+                {
+                    if (m_HijackQuit)
+                    {
+                        StartCoroutine(ResetSimulation());
+                        m_HijackQuit = false;
+                        return false;
+                    }
+
+                    return true;
+                };
+#endif
             }
         }
-
-        internal SimulationState simulationState
-        {
-            get { return m_SimulationState ?? (m_SimulationState = CreateSimulationData()); }
-            private set => m_SimulationState = value;
-        }
-
+#endif
         /// <summary>
         /// The json metadata schema version the DatasetCapture's output conforms to.
         /// </summary>
         public static string SchemaVersion => "0.0.1";
 
+        public static string PerceptionVersion => "0.8.0-preview.4";
+
         /// <summary>
         /// Called when the simulation ends. The simulation ends on playmode exit, application exit, or when <see cref="ResetSimulation"/> is called.
         /// </summary>
-        public  event Action SimulationEnding;
+        public event Action SimulationEnding;
 
         public SensorHandle RegisterSensor(SensorDefinition sensor)
         {
@@ -63,7 +233,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// Starts a new sequence in the capture.
         /// </summary>
-        public  void StartNewSequence() => simulationState.StartNewSequence();
+        public void StartNewSequence() => simulationState.StartNewSequence();
 
         internal bool IsValid(string id) => simulationState.Contains(id);
 
@@ -73,37 +243,95 @@ namespace UnityEngine.Perception.GroundTruth
         }
 
         [RuntimeInitializeOnLoadMethod]
-         void OnInitializeOnLoad()
+        void OnInitializeOnLoad()
         {
-            Manager.Instance.ShutdownNotification += ResetSimulation;
+            Manager.Instance.ShutdownNotification += OnApplicationShutdown;
         }
 
+        void OnApplicationQuit()
+        {
+
+            ResetSimulation();
+//            StartCoroutine(ResetSimulation());
+        }
+
+        void OnDisable()
+        {
+
+//            StartCoroutine(ResetSimulation());
+        }
+
+        void OnDestroy()
+        {
+            Debug.Log("ON Destroy");
+        }
+
+        bool m_ReadyToShutdown = false;
+
+        void OnApplicationShutdown()
+        {
+            Debug.Log("On application Quit");
+            ResetSimulation();
+            m_ReadyToShutdown = true;
+
+//            Manager.Instance.ShutdownAfterFrames(5);
+
+//            Manager.Instance.Shutdown();
+//            StartCoroutine(ResetSimulation());
+        }
+
+#if false
         /// <summary>
         /// Stop the current simulation and start a new one. All pending data is written to disk before returning.
         /// </summary>
-        public  void ResetSimulation()
+        public IEnumerator ResetSimulation()
         {
             //this order ensures that exceptions thrown by End() do not prevent the state from being reset
             SimulationEnding?.Invoke();
             var oldSimulationState = simulationState;
             simulationState = CreateSimulationData();
-            oldSimulationState.End();
+            simulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
+            yield return StartCoroutine(oldSimulationState.End());
+            if (!m_HijackQuit) Application.Quit();
         }
-    }
 
-    /// <summary>
-    /// Capture trigger modes for sensors.
-    /// </summary>
-    public enum CaptureTriggerMode
-    {
-        /// <summary>
-        /// Captures happen automatically based on a start frame and frame delta time.
-        /// </summary>
-        Scheduled,
-        /// <summary>
-        /// Captures should be triggered manually through calling the manual capture method of the sensor using this trigger mode.
-        /// </summary>
-        Manual
+#else
+        public void Update()
+        {
+            simulationState.Update();
+
+            List<SimulationState> toClear = new List<SimulationState>();
+            foreach (var oldie in m_OldSimStates)
+            {
+                oldie.TryToClearOut();
+            }
+
+            m_OldSimStates.RemoveAll(oldie => oldie.ReadyToShutdown);
+
+            if (m_ReadyToShutdown)
+            {
+                Debug.Log("stop here");
+            }
+
+            EditModePlayStateController.Done = m_ReadyToShutdown && !m_OldSimStates.Any();
+        }
+
+        public void ResetSimulation()
+        {
+//            Manager.Instance.Shutdown();
+
+            SimulationEnding?.Invoke();
+            var oldState = simulationState;
+            simulationState = CreateSimulationData();
+            simulationState.consumerEndpoint = CreateConsumerEndpoint(typeof(SoloConsumer));
+
+            m_OldSimStates.Add(oldState);
+            oldState.End();
+
+            m_ReadyToShutdown = true;
+        }
+
+#endif
     }
 
     public enum FutureType
@@ -121,18 +349,18 @@ namespace UnityEngine.Perception.GroundTruth
         bool IsPending();
     }
 
-    public struct AsyncSensorFuture : IAsyncFuture<SimulationState.SPendingSensorId>
+    public struct AsyncSensorFuture : IAsyncFuture<SimulationState.PendingSensorId>
     {
-        public AsyncSensorFuture(SimulationState.SPendingSensorId id, SimulationState simulationState)
+        public AsyncSensorFuture(SimulationState.PendingSensorId id, SimulationState simulationState)
         {
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.SPendingSensorId m_Id;
+        SimulationState.PendingSensorId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.SPendingSensorId GetId()
+        public SimulationState.PendingSensorId GetId()
         {
             return m_Id;
         }
@@ -153,18 +381,18 @@ namespace UnityEngine.Perception.GroundTruth
         }
     }
 
-    public struct AsyncAnnotationFuture : IAsyncFuture<SimulationState.SPendingCaptureId>
+    public struct AsyncAnnotationFuture : IAsyncFuture<SimulationState.PendingCaptureId>
     {
-        public AsyncAnnotationFuture(SimulationState.SPendingCaptureId id, SimulationState simulationState)
+        public AsyncAnnotationFuture(SimulationState.PendingCaptureId id, SimulationState simulationState)
         {
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.SPendingCaptureId m_Id;
+        SimulationState.PendingCaptureId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.SPendingCaptureId GetId()
+        public SimulationState.PendingCaptureId GetId()
         {
             return m_Id;
         }
@@ -185,18 +413,18 @@ namespace UnityEngine.Perception.GroundTruth
         }
     }
 
-    public struct AsyncMetricFuture : IAsyncFuture<SimulationState.SPendingCaptureId>
+    public struct AsyncMetricFuture : IAsyncFuture<SimulationState.PendingCaptureId>
     {
-        public AsyncMetricFuture(SimulationState.SPendingCaptureId id, SimulationState simulationState)
+        public AsyncMetricFuture(SimulationState.PendingCaptureId id, SimulationState simulationState)
         {
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.SPendingCaptureId m_Id;
+        SimulationState.PendingCaptureId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.SPendingCaptureId GetId()
+        public SimulationState.PendingCaptureId GetId()
         {
             return m_Id;
         }
@@ -270,24 +498,24 @@ namespace UnityEngine.Perception.GroundTruth
             return DatasetCapture.Instance.simulationState.ReportAnnotationAsync(annotationDefinition, this);
         }
 
-        public AsyncSensorFuture ReportSensorAsync(SensorDefinition sensorDefinition)
+        public AsyncSensorFuture ReportSensorAsync()
         {
             if (!ShouldCaptureThisFrame)
                 throw new InvalidOperationException("Annotation reported on SensorHandle in frame when its ShouldCaptureThisFrame is false.");
-            if (!sensorDefinition.IsValid())
-                throw new ArgumentException("The given annotationDefinition is invalid", nameof(sensorDefinition));
+            if (!IsValid)
+                throw new ArgumentException($"The given annotationDefinition is invalid {Id}");
 
-            return DatasetCapture.Instance.simulationState.ReportSensorAsync(sensorDefinition);
+            return DatasetCapture.Instance.simulationState.ReportSensorAsync(this);
         }
 
-        public void ReportSensor(SensorDefinition definition, Sensor sensor)
+        public void ReportSensor(Sensor sensor)
         {
             if (!ShouldCaptureThisFrame)
                 throw new InvalidOperationException("Annotation reported on SensorHandle in frame when its ShouldCaptureThisFrame is false.");
-            if (!definition.IsValid())
-                throw new ArgumentException("The given annotationDefinition is invalid", nameof(definition));
+            if (!IsValid)
+                throw new ArgumentException("The given annotationDefinition is invalid", Id);
 
-           DatasetCapture.Instance.simulationState.ReportSensor(definition, sensor);
+           DatasetCapture.Instance.simulationState.ReportSensor(this, sensor);
         }
 
         /// <summary>

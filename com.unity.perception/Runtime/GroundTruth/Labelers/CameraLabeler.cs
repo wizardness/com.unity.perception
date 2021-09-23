@@ -15,9 +15,6 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public abstract class CameraLabeler
     {
-        // TODO protect from null
-        internal DatasetCapture DatasetCapture => DatasetCapture.Instance;
-
         /// <summary>
         /// A human-readable description of the labeler
         /// </summary>

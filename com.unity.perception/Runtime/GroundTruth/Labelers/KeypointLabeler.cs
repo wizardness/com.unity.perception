@@ -247,7 +247,7 @@ namespace UnityEngine.Perception.GroundTruth
                 throw new InvalidOperationException($"{nameof(KeypointLabeler)}'s idLabelConfig field must be assigned");
 
             m_AnnotationDefinition = new Definition(TemplateToJson(activeTemplate, idLabelConfig));
-            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+            DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 
             // Texture to use in case the template does not contain a texture for the joints or the skeletal connections
             m_MissingTexture = new Texture2D(1, 1);

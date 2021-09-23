@@ -117,7 +117,7 @@ namespace UnityEngine.Perception.GroundTruth
                 description = k_Description
             };
 
-            DatasetCapture.RegisterMetric(m_Definition);
+            DatasetCapture.Instance.RegisterMetric(m_Definition);
             visualizationEnabled = supportsVisualization;
         }
 

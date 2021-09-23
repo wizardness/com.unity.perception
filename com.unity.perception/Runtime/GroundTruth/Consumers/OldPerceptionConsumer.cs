@@ -114,9 +114,9 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         Dictionary<int, Guid> m_SequenceToGuidMap = new Dictionary<int, Guid>();
         List<PerceptionCapture> m_CurrentCaptures = new List<PerceptionCapture>();
 
-        void Start()
+        protected override bool IsComplete()
         {
-            // Only here to get the check mark to show up in Unity Editor
+            return true;
         }
 
         internal string VerifyDirectoryWithGuidExists(string directoryPrefix, bool appendGuid = true)

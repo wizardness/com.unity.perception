@@ -261,7 +261,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             m_AnnotationDefinition = new SemanticSegmentationDefinition(specs);
-            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+            DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 
             m_SemanticSegmentationTextureReader = new RenderTextureReader<Color32>(targetTexture);
             visualizationEnabled = supportsVisualization;

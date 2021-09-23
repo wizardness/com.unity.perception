@@ -1,9 +1,24 @@
-﻿using UnityEngine.Perception.GroundTruth.DataModel;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using Unity.Simulation;
+using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.GroundTruth
 {
-    public abstract class ConsumerEndpoint : MonoBehaviour
+    public abstract class ConsumerEndpoint
     {
+        IEnumerator WaitForComplete()
+        {
+            yield return new WaitUntil(IsComplete);
+        }
+#if false
+        public virtual bool IsComplete => true;
+#else
+        protected abstract bool IsComplete();
+
+
+#endif
         /// <summary>
         /// Called when the simulation begins. Provides simulation wide metadata to
         /// the consumer.

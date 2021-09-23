@@ -136,7 +136,7 @@ namespace UnityEngine.Perception.GroundTruth
         public IdLabelConfig idLabelConfig;
 
         Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)> m_AsyncData;
-        List<BoundingBoxAnnotation.Entry> m_BoundingBoxValues;
+        List<BoundingBoxAnnotation.Entry> m_ToVisualize;
 
         Vector2 m_OriginalScreenSize = Vector2.zero;
 
@@ -190,12 +190,11 @@ namespace UnityEngine.Perception.GroundTruth
                 throw new InvalidOperationException("BoundingBox2DLabeler's idLabelConfig field must be assigned");
 
             m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)>();
-            m_BoundingBoxValues = new List<BoundingBoxAnnotation.Entry>();
 
             var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBoxAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
             m_AnnotationDefinition = new BoundingBoxAnnotationDefinition(spec);
 
-            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+            DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 #if false
             m_BoundingBoxAnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("bounding box", idLabelConfig.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
@@ -235,14 +234,14 @@ namespace UnityEngine.Perception.GroundTruth
             m_AsyncData.Remove(frameCount);
             using (s_BoundingBoxCallback.Auto())
             {
-                m_BoundingBoxValues.Clear();
+                var bbValues = new List<BoundingBoxAnnotation.Entry>();
                 for (var i = 0; i < renderedObjectInfos.Length; i++)
                 {
                     var objectInfo = renderedObjectInfos[i];
                     if (!asyncData.labelEntryMatchCache.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry, out _))
                         continue;
 
-                    m_BoundingBoxValues.Add(new BoundingBoxAnnotation.Entry
+                    bbValues.Add(new BoundingBoxAnnotation.Entry
                         {
                             labelId = labelEntry.id,
                             labelName = labelEntry.label,
@@ -256,9 +255,11 @@ namespace UnityEngine.Perception.GroundTruth
                 if (!CaptureOptions.useAsyncReadbackIfSupported && frameCount != Time.frameCount)
                     Debug.LogWarning("Not on current frame: " + frameCount + "(" + Time.frameCount + ")");
 
+                m_ToVisualize = bbValues;
+
                 boundingBoxesCalculated?.Invoke(new BoundingBoxesCalculatedEventArgs()
                 {
-                    data = m_BoundingBoxValues,
+                    data = bbValues,
                     frameCount = frameCount
                 });
 #if true
@@ -268,7 +269,7 @@ namespace UnityEngine.Perception.GroundTruth
                     Id = m_AnnotationDefinition.id,
                     annotationType = m_AnnotationDefinition.annotationType,
                     description = m_AnnotationDefinition.description,
-                    boxes = m_BoundingBoxValues
+                    boxes = bbValues
                 };
 
                 asyncData.annotation.Report(toReport);
@@ -280,7 +281,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnVisualize()
         {
-            if (m_BoundingBoxValues == null) return;
+            if (m_ToVisualize == null) return;
 
             GUI.depth = 5;
 
@@ -289,7 +290,7 @@ namespace UnityEngine.Perception.GroundTruth
             var screenRatioWidth = Screen.width / m_OriginalScreenSize.x;
             var screenRatioHeight = Screen.height / m_OriginalScreenSize.y;
 
-            foreach (var box in m_BoundingBoxValues)
+            foreach (var box in m_ToVisualize)
             {
                 var x = box.origin.x * screenRatioWidth;
                 var y = box.origin.y * screenRatioHeight;

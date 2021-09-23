@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using Unity.Simulation;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.Randomization.Scenarios
 {
@@ -40,23 +43,44 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                 return true;
             }
         }
+#if false
+        class ShutdownCondition : ICondition
+        {
+            public bool HasConditionBeenMet()
+            {
+                if (DatasetCapture.Instance.ReadyToShutdown)
+                {
+                    Debug.Log("Triggered dc ready");
+                }
 
+                return DatasetCapture.Instance.ReadyToShutdown;
+            }
+        }
+#endif
         /// <inheritdoc/>
         protected override void OnStart()
         {
             var md = new MetricDefinition();
             DatasetCapture.Instance.RegisterMetric(md);
 
+//            Manager.Instance.ShutdownCondition = new ShutdownCondition();
+
+            Manager.Instance.ShutdownNotification += () =>
+            {
+//                DatasetCapture.Instance.ResetSimulation();
+                Quit();
+            };
+
 #if false
-            m_IterationMetricDefinition = DatasetCapture.Instance.RegisterMetricDefinition(
+            m_IterationMetricDefinition = DatasetCapture.RegisterMetricDefinition(
                 "scenario_iteration", "Iteration information for dataset sequences",
                 Guid.Parse(k_ScenarioIterationMetricDefinitionId));
 
-            var randomSeedMetricDefinition = DatasetCapture.Instance.RegisterMetricDefinition(
+            var randomSeedMetricDefinition = DatasetCapture.RegisterMetricDefinition(
                 "random-seed",
                 "The random seed used to initialize the random state of the simulation. Only triggered once per simulation.",
                 Guid.Parse("14adb394-46c0-47e8-a3f0-99e754483b76"));
-            DatasetCapture.Instance.ReportMetric(randomSeedMetricDefinition, new[] { genericConstants.randomSeed });
+            DatasetCapture.ReportMetric(randomSeedMetricDefinition, new[] { genericConstants.randomSeed });
 #endif
         }
 
@@ -65,7 +89,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         {
             DatasetCapture.Instance.StartNewSequence();
 #if false
-            DatasetCapture.Instance.ReportMetric(m_IterationMetricDefinition, new[]
+            DatasetCapture.ReportMetric(m_IterationMetricDefinition, new[]
             {
                 new IterationMetricData { iteration = currentIteration }
             });
@@ -73,11 +97,21 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         }
 
         /// <inheritdoc/>
+
+#if false
+        protected override IEnumerator OnComplete()
+        {
+            yield return StartCoroutine(DatasetCapture.Instance.ResetSimulation());
+#else
         protected override void OnComplete()
         {
             DatasetCapture.Instance.ResetSimulation();
-            Manager.Instance.Shutdown();
-            Quit();
+
+            //Manager.Instance.ShutdownAfterFrames(105);
+            //Manager.Instance.Shutdown();
+            //DatasetCapture.Instance.ResetSimulation();
+#endif
+//            Quit();
         }
 #if false
         /// <summary>

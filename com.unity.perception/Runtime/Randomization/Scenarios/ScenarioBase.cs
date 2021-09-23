@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
@@ -232,8 +233,15 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// OnComplete is called when this scenario's isScenarioComplete property
         /// returns true during its main update loop
         /// </summary>
-        protected virtual void OnComplete() { }
+#if false
+        protected virtual IEnumerator OnComplete()
+        {
 
+            yield break;
+        }
+#else
+        protected virtual void OnComplete() { }
+#endif
         /// <summary>
         /// OnIdle is called each frame after the scenario has completed
         /// </summary>
@@ -343,7 +351,11 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             {
                 foreach (var randomizer in activeRandomizers)
                     randomizer.ScenarioComplete();
+#if false
+                StartCoroutine(OnComplete());
+#else
                 OnComplete();
+#endif
                 state = State.Idle;
                 OnIdle();
                 return;

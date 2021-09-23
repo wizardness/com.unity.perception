@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
@@ -205,6 +206,9 @@ namespace UnityEngine.Perception.GroundTruth
             SetupVisualizationCamera();
 
             DatasetCapture.Instance.SimulationEnding += OnSimulationEnding;
+
+            Manager.Instance.ShutdownNotification += OnSimulationEnding;
+
         }
 
         void OnEnable()
@@ -298,6 +302,8 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnDisable()
         {
+
+
             RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
             RenderPipelineManager.endFrameRendering -= OnEndFrameRendering;
             RenderPipelineManager.endCameraRendering -= CheckForRendererFeature;
@@ -325,7 +331,7 @@ namespace UnityEngine.Perception.GroundTruth
                 m_SensorDefinition = new SensorDefinition(ID, "camera", description)
                 {
                     firstCaptureFrame = firstCaptureFrame,
-                    captureTriggerMode = captureTriggerMode.ToString(),
+                    captureTriggerMode = captureTriggerMode,
                     simulationDeltaTime = simulationDeltaTime,
                     framesBetweenCaptures = framesBetweenCaptures,
                     manualSensorsAffectTiming = manualSensorAffectSimulationTiming
@@ -433,11 +439,6 @@ namespace UnityEngine.Perception.GroundTruth
 
         void CaptureRgbData(Camera cam)
         {
-            if (!captureRgbImages)
-                return;
-
-            Profiler.BeginSample("CaptureDataFromLastFrame");
-
             var capture = new RgbSensor
             {
                 Id = "perception_camera",
@@ -449,8 +450,19 @@ namespace UnityEngine.Perception.GroundTruth
                 acceleration = Vector3.zero,
                 imageFormat = ".png",
                 dimension = new Vector2(cam.pixelWidth, cam.pixelHeight),
-                buffer = null
+                buffer = new byte[0]
             };
+
+            if (!captureRgbImages)
+            {
+                SensorHandle.ReportSensor(capture);
+                return;
+            }
+
+
+            Profiler.BeginSample("CaptureDataFromLastFrame");
+
+
 
 
             //var width = cam.pixelWidth;
@@ -463,13 +475,15 @@ namespace UnityEngine.Perception.GroundTruth
             SetPersistentSensorData("camera_intrinsic", ToProjectionMatrix3x3(cam.projectionMatrix));
             SetPersistentSensorData("projection", cam.orthographic ? "orthographic" : "perspective");
 
-            var asyncSensor = SensorHandle.ReportSensorAsync(m_SensorDefinition);
+            var asyncSensor = SensorHandle.ReportSensorAsync();
 
 #if false
             SensorHandle.ReportCapture(dxRootPath, SensorSpatialData.FromGameObjects(
                 m_EgoMarker == null ? null : m_EgoMarker.gameObject, gameObject),
                 m_PersistentSensorData.Select(kvp => (kvp.Key, kvp.Value)).ToArray());
 #endif
+
+
             Func<AsyncRequest<CaptureCamera.CaptureState>, AsyncRequest.Result> colorFunctor;
 
             colorFunctor = r =>
@@ -477,21 +491,17 @@ namespace UnityEngine.Perception.GroundTruth
                 using (s_WriteFrame.Auto())
                 {
                     var dataColorBuffer = (byte[])r.data.colorBuffer;
-
+#if true
                     byte[] encodedData;
                     using (s_EncodeAndSave.Auto())
                     {
                         encodedData = ImageConversion.EncodeArrayToPNG(
                             dataColorBuffer, GraphicsFormat.R8G8B8A8_UNorm, (uint)capture.dimension.x, (uint)capture.dimension.y);
                     }
-#if false
-                    SetPersistentSensorData("buffer", encodedData);
-
-                    return !FileProducer.Write(captureFilename, encodedData)
-                        ? AsyncRequest.Result.Error
-                        : AsyncRequest.Result.Completed;
-#endif
                     capture.buffer = encodedData;
+#else
+                    capture.buffer = dataColorBuffer;
+#endif
                     asyncSensor.Report(capture);
 
                     return AsyncRequest.Result.Completed;
@@ -508,13 +518,14 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnSimulationEnding()
         {
+            m_Done = true;
             CleanUpInstanceSegmentation();
             foreach (var labeler in m_Labelers)
             {
                 if (labeler.isInitialized)
                     labeler.InternalCleanup();
             }
-        }
+       }
 
         void OnBeginCameraRendering(ScriptableRenderContext scriptableRenderContext, Camera cam)
         {
@@ -560,8 +571,12 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
+        bool m_Done = false;
+
         bool ShouldCallLabelers(Camera cam, int lastFrameCalledThisCallback)
         {
+            if (m_Done) return false;
+
             if (cam != attachedCamera)
                 return false;
             if (!SensorHandle.ShouldCaptureThisFrame)

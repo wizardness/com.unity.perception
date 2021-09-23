@@ -1,4 +1,6 @@
-﻿namespace UnityEngine.Perception.GroundTruth
+﻿using Unity.Simulation;
+
+namespace UnityEngine.Perception.GroundTruth
 {
     /// <summary>
     /// PerceptionUpdater is automatically spawned when the player starts and is used to coordinate and maintain
@@ -17,12 +19,10 @@
             DontDestroyOnLoad(updaterObject);
         }
 
-        // TODO - all of this can be rolled into dataset capture
-
         void LateUpdate()
         {
             LabelManager.singleton.RegisterPendingLabels();
-            DatasetCapture.Instance.simulationState?.Update();
+            DatasetCapture.Instance.Update();
         }
     }
 }

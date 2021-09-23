@@ -5,17 +5,6 @@ using UnityEngine.Perception.GroundTruth;
 [RequireComponent(typeof(PerceptionCamera))]
 public class CustomAnnotationAndMetricReporter : MonoBehaviour
 {
-    DatasetCapture _DatasetCapture;
-
-    internal DatasetCapture DatasetCapture
-    {
-        get
-        {
-            if (_DatasetCapture == null) _DatasetCapture = GameObject.Find("DatasetCapture").GetComponent<DatasetCapture>();
-            return _DatasetCapture;
-        }
-    }
-
     public GameObject targetLight;
     public GameObject target;
 

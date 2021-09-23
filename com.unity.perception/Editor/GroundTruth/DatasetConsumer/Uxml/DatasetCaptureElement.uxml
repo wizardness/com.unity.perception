@@ -1,0 +1,6 @@
+﻿<UXML xmlns="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements">
+    <VisualElement>
+        <Style src="../../Uss/Styles.uss"/>
+        <VisualElement name="endpoint-list-placeholder" style = "margin-top: 10px"/>
+    </VisualElement>
+</UXML>

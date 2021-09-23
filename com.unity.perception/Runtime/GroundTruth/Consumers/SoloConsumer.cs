@@ -12,13 +12,15 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
     {
         public string _baseDirectory = "D:/PerceptionOutput/SoloConsumer";
         public string soloDatasetName = "solo";
-        static string currentDirectory = "";
 
+        static string currentDirectory = "";
         SimulationMetadata m_CurrentMetadata;
 
-        void Start()
+        bool m_IsComplete = false;
+
+        protected override bool IsComplete()
         {
-            // Only here to get the check mark to show up in Unity Editor
+            return m_IsComplete;
         }
 
         public override void OnSimulationStarted(SimulationMetadata metadata)
@@ -76,13 +78,42 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             path = Path.Combine(path, $"step{frame.step}.frame_data.json");
 
             WriteJTokenToFile(path, ToFrame(frame));
-
-            Debug.Log("SC - On Frame Generated");
         }
 
         public override void OnSimulationCompleted(CompletionMetadata metadata)
         {
-            Debug.Log("SC - On Simulation Completed");
+            var path = Path.Combine(currentDirectory, "metadata.json");
+            WriteJTokenToFile(path, ToMetadata(metadata));
+            m_IsComplete = true;
+        }
+
+        static JToken ToMetadata(CompletionMetadata metadata)
+        {
+            var sequences = new JArray();
+            if (metadata.sequences != null)
+            {
+                foreach (var sequence in metadata.sequences)
+                {
+                    sequences.Add(new JObject
+                    {
+                        ["id"] = sequence.id,
+                        ["number_of_steps"] = sequence.numberOfSteps
+                    });
+                }
+
+                sequences.Add(new JObject());
+            }
+
+            var json = new JObject
+            {
+                ["unity_version"] = metadata.unityVersion,
+                ["perception_version"] = metadata.perceptionVersion,
+                ["render_pipeline"] = metadata.renderPipeline,
+                ["total_frames"] = metadata.totalFrames,
+                ["sequences"] = sequences
+            };
+
+            return json;
         }
 
         static JToken ToFrame(Frame frame)
@@ -160,10 +191,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             var path = GetSequenceDirectoryPath(frame);
 
             path = Path.Combine(path, $"step{frame.step}.{sensor.sensorType}.{sensor.imageFormat}");
+#if true
             var file = File.Create(path, 4096);
             file.Write(sensor.buffer, 0, sensor.buffer.Length);
             file.Close();
-
+#endif
             var outRgb = ToSensorHeader(frame, sensor);
             outRgb["fileName"] = path;
             outRgb["imageFormat"] = sensor.imageFormat;

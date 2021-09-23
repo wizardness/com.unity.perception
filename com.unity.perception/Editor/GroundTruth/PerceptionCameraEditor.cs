@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Perception.GroundTruth.Exporters;
 
 namespace UnityEditor.Perception.GroundTruth

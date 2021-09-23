@@ -9,6 +9,21 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         void ToMessage(IMessageBuilder builder);
     }
 
+    /// <summary>
+    /// Capture trigger modes for sensors.
+    /// </summary>
+    public enum CaptureTriggerMode
+    {
+        /// <summary>
+        /// Captures happen automatically based on a start frame and frame delta time.
+        /// </summary>
+        Scheduled,
+        /// <summary>
+        /// Captures should be triggered manually through calling the manual capture method of the sensor using this trigger mode.
+        /// </summary>
+        Manual
+    }
+
     [Serializable]
     public class SensorDefinition : IMessageProducer
     {
@@ -17,11 +32,11 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
             this.id = id;
             this.modality = modality;
             this.definition = definition;
-            this.firstCaptureFrame = 0;
-            this.captureTriggerMode = string.Empty;
-            this.simulationDeltaTime = 0.0f;
-            this.framesBetweenCaptures = 0;
-            this.manualSensorsAffectTiming = false;
+            firstCaptureFrame = 0;
+            captureTriggerMode = CaptureTriggerMode.Scheduled;
+            simulationDeltaTime = 0.0f;
+            framesBetweenCaptures = 0;
+            manualSensorsAffectTiming = false;
         }
 
         public virtual bool IsValid()
@@ -33,7 +48,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         public string modality;
         public string definition;
         public float firstCaptureFrame;
-        public string captureTriggerMode;
+        public CaptureTriggerMode captureTriggerMode;
         public float simulationDeltaTime;
         public int framesBetweenCaptures;
         public bool manualSensorsAffectTiming;
@@ -44,7 +59,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
             builder.AddString("modality", modality);
             builder.AddString("definition", definition);
             builder.AddFloat("first_capture_frame", firstCaptureFrame);
-            builder.AddString("capture_trigger_mode", captureTriggerMode);
+            builder.AddString("capture_trigger_mode", captureTriggerMode.ToString());
             builder.AddFloat("simulation_delta_time", simulationDeltaTime);
             builder.AddInt("frames_between_captures", framesBetweenCaptures);
             builder.AddBoolean("manual_sensors_affect_timing", manualSensorsAffectTiming);
@@ -335,7 +350,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     {
         public SimulationMetadata()
         {
-            unityVersion = "figure out how to do unity version";
+            unityVersion = "not_set";
             perceptionVersion = "0.8.0-preview.4";
 #if HDRP_PRESENT
             renderPipeline = "HDRP";

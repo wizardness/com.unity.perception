@@ -16,12 +16,12 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         public string soloDatasetName = "solo_mb";
         static string currentDirectory = "";
 
-        SimulationMetadata m_CurrentMetadata;
-
-        void Start()
+        protected override bool IsComplete()
         {
-            // Only here to get the check mark to show up in Unity Editor
+            return true;
         }
+
+        SimulationMetadata m_CurrentMetadata;
 
         public override void OnSimulationStarted(SimulationMetadata metadata)
         {

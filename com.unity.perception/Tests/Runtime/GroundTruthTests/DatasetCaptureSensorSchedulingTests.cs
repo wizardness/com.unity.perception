@@ -7,6 +7,7 @@ using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.TestTools;
 using Random = UnityEngine.Random;
 
@@ -16,14 +17,13 @@ namespace GroundTruthTests
     // due to protection level - use only when testing protected logic is critical
     class SimulationStateTestHelper
     {
-#if false
-        SimulationState m_State => DatasetCapture.SimulationState;
         Dictionary<SensorHandle, SimulationState.SensorData> m_SensorsReference;
         MethodInfo m_SequenceTimeOfNextCaptureMethod;
-#endif
+        SimulationState m_State;
+
         internal SimulationStateTestHelper()
         {
-#if false
+            m_State = DatasetCapture.Instance.simulationState;
             var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
             m_SequenceTimeOfNextCaptureMethod = m_State.GetType().GetMethod("GetSequenceTimeOfNextCapture", bindingFlags);
             Debug.Assert(m_SequenceTimeOfNextCaptureMethod != null, "Couldn't find sequence time method.");
@@ -31,19 +31,16 @@ namespace GroundTruthTests
             Debug.Assert(sensorsField != null, "Couldn't find internal sensors field");
             m_SensorsReference = (Dictionary<SensorHandle, SimulationState.SensorData>)(sensorsField.GetValue(m_State));
             Debug.Assert(m_SensorsReference != null, "Couldn't cast sensor field to dictionary");
-#endif
         }
 
         internal float CallSequenceTimeOfNextCapture(SimulationState.SensorData sensorData)
         {
-//            return (float)m_SequenceTimeOfNextCaptureMethod.Invoke(m_State, new object[] { sensorData });
-            return 0;
+            return (float)m_SequenceTimeOfNextCaptureMethod.Invoke(m_State, new object[] { sensorData });
         }
 
         internal SimulationState.SensorData GetSensorData(SensorHandle sensorHandle)
         {
-//            return m_SensorsReference[sensorHandle];
-            return new SimulationState.SensorData();
+            return m_SensorsReference[sensorHandle];
         }
     }
 
@@ -62,17 +59,28 @@ namespace GroundTruthTests
         public void TearDown()
         {
             Time.timeScale = 1;
- //           DatasetCapture.ResetSimulation();
+            DatasetCapture.Instance.ResetSimulation();
+        }
+
+        SensorDefinition CreateSensorDefinition(string id, string modality, string def, int firstFrame, CaptureTriggerMode mode, float deltaTime, int framesBetween)
+        {
+            return new SensorDefinition(id, modality, def)
+            {
+                firstCaptureFrame = firstFrame,
+                captureTriggerMode = mode,
+                simulationDeltaTime = deltaTime,
+                framesBetweenCaptures = framesBetween
+            };
         }
 
         [UnityTest]
         public IEnumerator SequenceTimeOfNextCapture_ReportsCorrectTime()
         {
-#if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var firstCaptureFrame = 2f;
+            var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
-            var sensorHandle = DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0);
+
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(
+                CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             var startTime = firstCaptureFrame * simulationDeltaTime;
             float[] sequenceTimesExpected =
@@ -96,19 +104,18 @@ namespace GroundTruthTests
                 Assert.AreEqual(sequenceTimesExpected[i], sequenceTimeActual, 0.0001f);
                 yield return null;
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator SequenceTimeOfNextCapture_WithInBetweenFrames_ReportsCorrectTime()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
             var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
             var framesBetweenCaptures = 2;
-            var sensorHandle = DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, framesBetweenCaptures);
+
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(
+                CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, framesBetweenCaptures));
+
             var startingFrame = Time.frameCount;
 
             var startTime = firstCaptureFrame * simulationDeltaTime;
@@ -146,18 +153,16 @@ namespace GroundTruthTests
                     yield return null;
                 }
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator FramesScheduledBySensorConfig()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var firstCaptureFrame = 2f;
+            var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
-            DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0);
+
+            DatasetCapture.Instance.RegisterSensor(
+                CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             float[] deltaTimeSamplesExpected =
             {
@@ -172,21 +177,18 @@ namespace GroundTruthTests
                 yield return null;
                 Assert.AreEqual(deltaTimeSamplesExpected[i], Time.deltaTime, 0.0001f);
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator FramesScheduled_WithTimeScale_ResultsInProperDeltaTime()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var firstCaptureFrame = 2f;
+            var firstCaptureFrame = 2;
             var simulationDeltaTime = 1f;
-
             var timeScale = 2;
             Time.timeScale = timeScale;
-            DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0);
+
+            DatasetCapture.Instance.RegisterSensor(
+                CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             float[] deltaTimeSamplesExpected =
             {
@@ -201,37 +203,27 @@ namespace GroundTruthTests
                 yield return null;
                 Assert.AreEqual(deltaTimeSamplesExpected[i], Time.deltaTime, 0.0001f);
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator ChangingTimeScale_CausesDebugError()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            DatasetCapture.RegisterSensor(ego, "cam", "", 2f, CaptureTriggerMode.Scheduled, 1, 0);
+           DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 2, CaptureTriggerMode.Scheduled, 1, 0));
 
             yield return null;
             Time.timeScale = 5;
             yield return null;
             LogAssert.Expect(LogType.Error, new Regex("Time\\.timeScale may not change mid-sequence.*"));
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator ChangingTimeScale_DuringStartNewSequence_Succeeds()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            DatasetCapture.RegisterSensor(ego, "cam", "", 2f, CaptureTriggerMode.Scheduled, 1, 0);
+            DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 2, CaptureTriggerMode.Scheduled, 1, 0));
 
             yield return null;
             Time.timeScale = 1;
-            DatasetCapture.StartNewSequence();
-            yield return null;
-#endif
+            DatasetCapture.Instance.StartNewSequence();
             yield return null;
         }
 
@@ -239,9 +231,7 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator FramesScheduled_WithChangingTimeScale_ResultsInProperDeltaTime()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var firstCaptureFrame = 2f;
+            var firstCaptureFrame = 2;
             var simulationDeltaTime = 1f;
             float[] newTimeScalesPerFrame =
             {
@@ -250,7 +240,8 @@ namespace GroundTruthTests
                 .01f,
                 1f
             };
-            DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, 1, 0);
+
+            DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, 1, 0));
 
             float[] deltaTimeSamplesExpected =
             {
@@ -266,42 +257,34 @@ namespace GroundTruthTests
                 yield return null;
                 Assert.AreEqual(deltaTimeSamplesExpected[i], Time.deltaTime, 0.0001f);
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator ResetSimulation_ResetsCaptureDeltaTime()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            DatasetCapture.RegisterSensor(ego, "cam", "", 0, CaptureTriggerMode.Scheduled, 5, 0);
+            DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Scheduled, 5, 0));
             yield return null;
             Assert.AreEqual(5, Time.captureDeltaTime);
-            DatasetCapture.ResetSimulation();
+            DatasetCapture.Instance.ResetSimulation();
             Assert.AreEqual(0, Time.captureDeltaTime);
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator ShouldCaptureFlagsAndRenderTimesAreCorrectWithMultipleSensors()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
             var firstCaptureFrame1 = 2;
             var simDeltaTime1 = 4;
             var framesBetweenCaptures1 = 2;
-            var sensor1 = DatasetCapture.RegisterSensor(ego, "cam", "1", firstCaptureFrame1, CaptureTriggerMode.Scheduled, simDeltaTime1, framesBetweenCaptures1);
+            var sensor1 = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam1", "", "", firstCaptureFrame1, CaptureTriggerMode.Scheduled, simDeltaTime1, framesBetweenCaptures1));
 
             var firstCaptureFrame2 = 1;
             var simDeltaTime2 = 6;
             var framesBetweenCaptures2 = 1;
-            var sensor2 = DatasetCapture.RegisterSensor(ego, "cam", "2", firstCaptureFrame2, CaptureTriggerMode.Scheduled, simDeltaTime2, framesBetweenCaptures2);
+            var sensor2 = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam2", "", "", firstCaptureFrame2, CaptureTriggerMode.Scheduled, simDeltaTime2, framesBetweenCaptures2));
 
             //Third sensor is a manually triggered one. All it does in this test is affect delta times.
             var simDeltaTime3 = 5;
-            var sensor3 = DatasetCapture.RegisterSensor(ego, "cam", "3", 0, CaptureTriggerMode.Manual, simDeltaTime3, 0, true);
+            var sensor3 = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam3", "", "", 0, CaptureTriggerMode.Manual, simDeltaTime3, 0)); // why is there a true on this one
 
             (float deltaTime, bool sensor1ShouldCapture, bool sensor2ShouldCapture, bool sensor3ShouldCapture)[] samplesExpected =
             {
@@ -326,8 +309,6 @@ namespace GroundTruthTests
             }
 
             CollectionAssert.AreEqual(samplesExpected, samplesActual);
-#endif
-            yield return null;
         }
 
         [UnityTest]
@@ -337,9 +318,7 @@ namespace GroundTruthTests
         [TestCase(235, 10, 2350, 2585, 2820, 3055, ExpectedResult = (IEnumerator)null)]
         public IEnumerator SequenceTimeOfNextCapture_ReportsCorrectTime_VariedDeltaTimesAndStartFrames(float simulationDeltaTime, int firstCaptureFrame, float firstCaptureTime, float secondCaptureTime, float thirdCaptureTime, float fourthCaptureTime)
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var sensorHandle = DatasetCapture.RegisterSensor(ego, "cam", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0);
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             float[] sequenceTimesExpected =
             {
@@ -362,16 +341,12 @@ namespace GroundTruthTests
                 Assert.AreEqual(sequenceTimesExpected[i], sequenceTimeActual, 0.0001f);
                 yield return null;
             }
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorDoesNotAffectTimings()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
-            var sensorHandle = DatasetCapture.RegisterSensor(ego, "cam", "", 0, CaptureTriggerMode.Manual, 0, 0, false);
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, 0, 0)); // why is there supposed to be a falise at the end of this
 
             var framesToCaptureOn = new List<int>();
 
@@ -406,17 +381,13 @@ namespace GroundTruthTests
             }
 
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
-#endif
-            yield return null;
         }
 
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorAffectsTimings()
         {
-            #if false
-            var ego = DatasetCapture.RegisterEgo("ego");
             var simulationDeltaTime = 0.05f;
-            var sensorHandle = DatasetCapture.RegisterSensor(ego, "cam", "", 0, CaptureTriggerMode.Manual, simulationDeltaTime, 0, true);
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, simulationDeltaTime, 0)); // why was there a true here...
 
             var framesToCaptureOn = new List<int>();
 
@@ -456,8 +427,6 @@ namespace GroundTruthTests
                 yield return null;
             }
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
-#endif
-            yield return null;
         }
     }
 }

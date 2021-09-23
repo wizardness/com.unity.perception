@@ -239,7 +239,7 @@ namespace UnityEngine.Perception.GroundTruth
             var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBox3DAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
             m_AnnotationDefinition = new BoundingBox3DAnnotationDefinition(spec);
 
-            DatasetCapture.RegisterAnnotationDefinition(m_AnnotationDefinition);
+            DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderObjectInfosCalculated;
 

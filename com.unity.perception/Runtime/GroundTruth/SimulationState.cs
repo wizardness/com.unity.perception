@@ -1,9 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 
 namespace UnityEngine.Perception.GroundTruth
 {
@@ -11,8 +15,11 @@ namespace UnityEngine.Perception.GroundTruth
     {
         HashSet<SensorHandle> m_ActiveSensors = new HashSet<SensorHandle>();
         Dictionary<SensorHandle, SensorData> m_Sensors = new Dictionary<SensorHandle, SensorData>();
+//        ConsumerEndpoint _Consumer;
 
-        int m_SequenceId = -1;
+        internal ConsumerEndpoint consumerEndpoint { get; set; }
+
+        int m_SequenceId = 0;
 
         HashSet<string> _Ids = new HashSet<string>();
 
@@ -22,14 +29,15 @@ namespace UnityEngine.Perception.GroundTruth
         float m_UnscaledSequenceTimeDoNotUse;
 
         int m_FrameCountLastStepIncremented = -1;
+        int m_TotalFrames = 0;
         int m_Step = -1;
 
         bool m_HasStarted;
         int m_CaptureFileIndex;
         List<AdditionalInfoTypeData> m_AdditionalInfoTypeData = new List<AdditionalInfoTypeData>();
 
-        Dictionary<SPendingFrameId, int> m_PendingIdToFrameMap = new Dictionary<SPendingFrameId, int>();
-        Dictionary<SPendingFrameId, PendingFrame> m_PendingFrames = new Dictionary<SPendingFrameId, PendingFrame>();
+        Dictionary<PendingFrameId, int> m_PendingIdToFrameMap = new Dictionary<PendingFrameId, int>();
+        Dictionary<PendingFrameId, PendingFrame> m_PendingFrames = new Dictionary<PendingFrameId, PendingFrame>();
 
         CustomSampler m_SerializeCapturesSampler = CustomSampler.Create("SerializeCaptures");
         CustomSampler m_SerializeCapturesAsyncSampler = CustomSampler.Create("SerializeCapturesAsync");
@@ -52,22 +60,19 @@ namespace UnityEngine.Perception.GroundTruth
             IsRunning = true;
         }
 
-        static ConsumerEndpoint GetActiveConsumer()
-        {
-            return DatasetCapture.Instance.activeConsumer;
-        }
+        public bool ReadyToShutdown => !m_PendingFrames.Any();
 
         public interface IPendingId
         {
-            SPendingFrameId AsFrameId();
-            SPendingSensorId AsSensorId();
+            PendingFrameId AsFrameId();
+            PendingSensorId AsSensorId();
 
             bool IsValid();
         }
 
-        public readonly struct SPendingFrameId : IPendingId, IEquatable<SPendingFrameId>, IEquatable<SPendingSensorId>, IEquatable<SPendingCaptureId>
+        public readonly struct PendingFrameId : IPendingId, IEquatable<PendingFrameId>, IEquatable<PendingSensorId>, IEquatable<PendingCaptureId>
         {
-            public SPendingFrameId(int sequence, int step)
+            public PendingFrameId(int sequence, int step)
             {
                 Sequence = sequence;
                 Step = step;
@@ -81,28 +86,28 @@ namespace UnityEngine.Perception.GroundTruth
             public int Sequence { get; }
             public int Step { get; }
 
-            public SPendingFrameId AsFrameId()
+            public PendingFrameId AsFrameId()
             {
                 return this;
             }
 
-            public SPendingSensorId AsSensorId()
+            public PendingSensorId AsSensorId()
             {
-                return new SPendingSensorId(string.Empty,this);
+                return new PendingSensorId(string.Empty,this);
             }
 
-            public bool Equals(SPendingFrameId other)
+            public bool Equals(PendingFrameId other)
             {
                 return Sequence == other.Sequence && Step == other.Step;
             }
 
-            public bool Equals(SPendingSensorId other)
+            public bool Equals(PendingSensorId other)
             {
                 var otherId = other.AsFrameId();
                 return Sequence == otherId.Sequence && Step == otherId.Step;
             }
 
-            public bool Equals(SPendingCaptureId other)
+            public bool Equals(PendingCaptureId other)
             {
                 var otherId = other.AsFrameId();
                 return Sequence == otherId.Sequence && Step == otherId.Step;
@@ -110,7 +115,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             public override bool Equals(object obj)
             {
-                return obj is SPendingFrameId other && Equals(other);
+                return obj is PendingFrameId other && Equals(other);
             }
 
             public override int GetHashCode()
@@ -122,15 +127,15 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
-        public readonly struct SPendingSensorId : IPendingId, IEquatable<SPendingSensorId>, IEquatable<SPendingFrameId>, IEquatable<SPendingCaptureId>
+        public readonly struct PendingSensorId : IPendingId, IEquatable<PendingSensorId>, IEquatable<PendingFrameId>, IEquatable<PendingCaptureId>
         {
-            public SPendingSensorId(string sensorId, int sequence, int step)
+            public PendingSensorId(string sensorId, int sequence, int step)
             {
                 SensorId = sensorId;
-                m_FrameId = new SPendingFrameId(sequence, step);
+                m_FrameId = new PendingFrameId(sequence, step);
             }
 
-            public SPendingSensorId(string sensorId, SPendingFrameId frameId)
+            public PendingSensorId(string sensorId, PendingFrameId frameId)
             {
                 SensorId = sensorId;
                 m_FrameId = frameId;
@@ -143,35 +148,35 @@ namespace UnityEngine.Perception.GroundTruth
 
             public string SensorId { get; }
 
-            readonly SPendingFrameId m_FrameId;
-            public SPendingFrameId AsFrameId()
+            readonly PendingFrameId m_FrameId;
+            public PendingFrameId AsFrameId()
             {
                 return m_FrameId;
             }
 
-            public SPendingSensorId AsSensorId()
+            public PendingSensorId AsSensorId()
             {
                 return this;
             }
 
-            public bool Equals(SPendingSensorId other)
+            public bool Equals(PendingSensorId other)
             {
                 return SensorId == other.SensorId && m_FrameId.Equals(other.m_FrameId);
             }
 
-            public bool Equals(SPendingFrameId other)
+            public bool Equals(PendingFrameId other)
             {
                 return m_FrameId.Equals(other);
             }
 
-            public bool Equals(SPendingCaptureId other)
+            public bool Equals(PendingCaptureId other)
             {
                 return Equals(other.SensorId);
             }
 
             public override bool Equals(object obj)
             {
-                return obj is SPendingSensorId other && Equals(other);
+                return obj is PendingSensorId other && Equals(other);
             }
 
             public override int GetHashCode()
@@ -183,15 +188,15 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
-        public readonly struct SPendingCaptureId : IPendingId, IEquatable<SPendingCaptureId>, IEquatable<SPendingSensorId>, IEquatable<SPendingFrameId>
+        public readonly struct PendingCaptureId : IPendingId, IEquatable<PendingCaptureId>, IEquatable<PendingSensorId>, IEquatable<PendingFrameId>
         {
-            public SPendingCaptureId(string sensorId, string captureId, int sequence, int step)
+            public PendingCaptureId(string sensorId, string captureId, int sequence, int step)
             {
                 CaptureId = captureId;
-                SensorId = new SPendingSensorId(sensorId, sequence, step);
+                SensorId = new PendingSensorId(sensorId, sequence, step);
             }
 
-            public SPendingCaptureId(string captureId, SPendingSensorId frameId)
+            public PendingCaptureId(string captureId, PendingSensorId frameId)
             {
                 CaptureId = captureId;
                 SensorId = frameId;
@@ -199,14 +204,14 @@ namespace UnityEngine.Perception.GroundTruth
 
             public string CaptureId { get; }
 
-            public SPendingSensorId SensorId { get; }
+            public PendingSensorId SensorId { get; }
 
-            public SPendingFrameId AsFrameId()
+            public PendingFrameId AsFrameId()
             {
                 return SensorId.AsFrameId();
             }
 
-            public SPendingSensorId AsSensorId()
+            public PendingSensorId AsSensorId()
             {
                 return SensorId;
             }
@@ -216,24 +221,24 @@ namespace UnityEngine.Perception.GroundTruth
                 return SensorId.IsValid() && !string.IsNullOrEmpty(CaptureId);
             }
 
-            public bool Equals(SPendingCaptureId other)
+            public bool Equals(PendingCaptureId other)
             {
                 return CaptureId == other.CaptureId && SensorId.Equals(other.SensorId);
             }
 
-            public bool Equals(SPendingSensorId other)
+            public bool Equals(PendingSensorId other)
             {
                 return SensorId.Equals(other);
             }
 
-            public bool Equals(SPendingFrameId other)
+            public bool Equals(PendingFrameId other)
             {
                 return SensorId.AsFrameId().Equals(other);
             }
 
             public override bool Equals(object obj)
             {
-                return obj is SPendingCaptureId other && Equals(other);
+                return obj is PendingCaptureId other && Equals(other);
             }
 
             public override int GetHashCode()
@@ -249,15 +254,15 @@ namespace UnityEngine.Perception.GroundTruth
 
         public class PendingSensor
         {
-            public PendingSensor(SPendingSensorId id)
+            public PendingSensor(PendingSensorId id)
             {
                 m_Id = id;
                 m_SensorData = null;
-                Annotations = new Dictionary<SPendingCaptureId, Annotation>();
-                Metrics = new Dictionary<SPendingCaptureId, Metric>();
+                Annotations = new Dictionary<PendingCaptureId, Annotation>();
+                Metrics = new Dictionary<PendingCaptureId, Metric>();
             }
 
-            public PendingSensor(SPendingSensorId id, Sensor sensorData) : this(id)
+            public PendingSensor(PendingSensorId id, Sensor sensorData) : this(id)
             {
                 m_SensorData = sensorData;
             }
@@ -270,10 +275,10 @@ namespace UnityEngine.Perception.GroundTruth
                 return m_SensorData;
             }
 
-            SPendingSensorId m_Id;
+            PendingSensorId m_Id;
             Sensor m_SensorData;
-            public Dictionary<SPendingCaptureId, Annotation> Annotations { get; private set; }
-            public Dictionary<SPendingCaptureId, Metric> Metrics { get; private set; }
+            public Dictionary<PendingCaptureId, Annotation> Annotations { get; private set; }
+            public Dictionary<PendingCaptureId, Metric> Metrics { get; private set; }
 
             public bool IsPending<T>(IAsyncFuture<T> asyncFuture) where T : IPendingId
             {
@@ -283,11 +288,11 @@ namespace UnityEngine.Perception.GroundTruth
                         return m_SensorData == null;
                     case FutureType.Annotation:
                     {
-                        return asyncFuture.GetId() is SPendingCaptureId captureId && Annotations.ContainsKey(captureId) && Annotations[captureId] == null;
+                        return asyncFuture.GetId() is PendingCaptureId captureId && Annotations.ContainsKey(captureId) && Annotations[captureId] == null;
                     }
                     case FutureType.Metric:
                     {
-                        return asyncFuture.GetId() is SPendingCaptureId captureId && Metrics.ContainsKey(captureId) && Metrics[captureId] == null;
+                        return asyncFuture.GetId() is PendingCaptureId captureId && Metrics.ContainsKey(captureId) && Metrics[captureId] == null;
                     }
                     default:
                         throw new ArgumentOutOfRangeException();
@@ -307,7 +312,7 @@ namespace UnityEngine.Perception.GroundTruth
                         return false;
                     case FutureType.Annotation:
                     {
-                        if (result is Annotation annotation && asyncFuture.GetId() is SPendingCaptureId capId)
+                        if (result is Annotation annotation && asyncFuture.GetId() is PendingCaptureId capId)
                         {
                             Annotations[capId] = annotation;
                             return true;
@@ -317,7 +322,7 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                     case FutureType.Metric:
                     {
-                        if (result is Metric metric && asyncFuture.GetId() is SPendingCaptureId capId)
+                        if (result is Metric metric && asyncFuture.GetId() is PendingCaptureId capId)
                         {
                             Metrics[capId] = metric;
                             return true;
@@ -341,14 +346,17 @@ namespace UnityEngine.Perception.GroundTruth
 
         public class PendingFrame
         {
-            public SPendingFrameId PendingId { get; }
+            SimulationState m_SimulationState;
+
+            public PendingFrameId PendingId { get; }
             public float Timestamp { get; set; }
-            internal Dictionary<SPendingSensorId, PendingSensor> sensors = new Dictionary<SPendingSensorId, PendingSensor>();
+            internal Dictionary<PendingSensorId, PendingSensor> sensors = new Dictionary<PendingSensorId, PendingSensor>();
             public bool CaptureReported { get; set; } = false;
-            public PendingFrame(SPendingFrameId pendingFrameId, float timestamp)
+            public PendingFrame(PendingFrameId pendingFrameId, float timestamp, SimulationState simState)
             {
                 PendingId = pendingFrameId;
                 Timestamp = timestamp;
+                m_SimulationState = simState;
             }
 
             public bool IsReadyToReport()
@@ -356,12 +364,12 @@ namespace UnityEngine.Perception.GroundTruth
                 return sensors.All(sensor => sensor.Value.IsReadyToReport());
             }
 
-            public PendingSensor GetOrCreatePendingSensor(SPendingSensorId sensorId)
+            public PendingSensor GetOrCreatePendingSensor(PendingSensorId sensorId)
             {
                 return GetOrCreatePendingSensor(sensorId, out var _);
             }
 
-            public PendingSensor GetOrCreatePendingSensor(SPendingSensorId sensorId, out bool created)
+            public PendingSensor GetOrCreatePendingSensor(PendingSensorId sensorId, out bool created)
             {
                 created = false;
 
@@ -391,7 +399,9 @@ namespace UnityEngine.Perception.GroundTruth
                 if (!sensorId.IsValid()) return false;
 
                 var sensor = GetOrCreatePendingSensor(sensorId);
-                return sensor.ReportAsyncResult(asyncFuture, result);
+                sensor.ReportAsyncResult(asyncFuture, result);
+
+                return true;
             }
         }
 
@@ -607,6 +617,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
+        bool m_FirstNewSequence = true;
         public void StartNewSequence()
         {
             ResetTimings();
@@ -620,7 +631,10 @@ namespace UnityEngine.Perception.GroundTruth
                 m_Sensors[kvp.Key] = sensorData;
             }
 
-            m_SequenceId++;
+            if (m_FirstNewSequence)
+                m_FirstNewSequence = false;
+            else
+                m_SequenceId++;
         }
 
         void ResetTimings()
@@ -666,7 +680,7 @@ namespace UnityEngine.Perception.GroundTruth
             m_ActiveSensors.Add(sensorHandle);
             m_Sensors.Add(sensorHandle, sensorData);
 
-            GetActiveConsumer()?.OnSensorRegistered(sensor);
+            consumerEndpoint.OnSensorRegistered(sensor);
 
             return sensorHandle;
         }
@@ -726,6 +740,8 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
+        SimulationMetadata m_SimulationMetadata;
+
         public void Update()
         {
             if (m_ActiveSensors.Count == 0)
@@ -733,7 +749,13 @@ namespace UnityEngine.Perception.GroundTruth
 
             if (!m_HasStarted)
             {
-                GetActiveConsumer()?.OnSimulationStarted(new SimulationMetadata());
+                m_SimulationMetadata = new SimulationMetadata()
+                {
+                    unityVersion = Application.unityVersion,
+                    perceptionVersion = DatasetCapture.PerceptionVersion,
+                };
+
+                consumerEndpoint.OnSimulationStarted(m_SimulationMetadata);
 
                 //simulation starts now
                 m_FrameCountLastUpdatedSequenceTime = Time.frameCount;
@@ -818,6 +840,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             WritePendingCaptures();
+
 //            WritePendingMetrics();
 
             Time.captureDeltaTime = nextFrameDt;
@@ -844,15 +867,21 @@ namespace UnityEngine.Perception.GroundTruth
 
             return data.sequenceTimeOfNextCapture - UnscaledSequenceTime < k_SimulationTimingAccuracy;
         }
-
-        public void End()
+#if false
+        public IEnumerator End()
         {
             if (_Ids.Count == 0)
-                return;
+                yield break;
 
-            WritePendingCaptures(true, true);
+            while (m_PendingFrames.Count > 0)
+            {
+                WritePendingCaptures(true, true);
+                yield return null;
+            }
+
             if (m_PendingFrames.Count > 0)
                 Debug.LogError($"Simulation ended with pending annotations: {string.Join(", ", m_PendingFrames.Select(c => $"id:{c.Key}"))}");
+
 #if false
             WritePendingMetrics(true);
             if (m_PendingMetrics.Count > 0)
@@ -883,20 +912,99 @@ namespace UnityEngine.Perception.GroundTruth
             Time.captureDeltaTime = 0;
             IsRunning = false;
 
-            var metadata = new CompletionMetadata();
-            GetActiveConsumer()?.OnSimulationCompleted(metadata);
+            var metadata = new CompletionMetadata()
+            {
+                unityVersion = m_SimulationMetadata.unityVersion,
+                perceptionVersion = m_SimulationMetadata.perceptionVersion,
+                renderPipeline = m_SimulationMetadata.renderPipeline,
+                totalFrames = m_TotalFrames
+            };
+
+            consumerEndpoint.OnSimulationCompleted(metadata);
+        }
+#else
+        internal bool CapturesLeft()
+        {
+            return m_PendingFrames.Count > 0;
         }
 
+        internal void TryToClearOut()
+        {
+            if (ReadyToShutdown) return;
+
+            WritePendingCaptures(true, true);
+
+            if (ReadyToShutdown)
+            {
+                var metadata = new CompletionMetadata()
+                {
+                    unityVersion = m_SimulationMetadata.unityVersion,
+                    perceptionVersion = m_SimulationMetadata.perceptionVersion,
+                    renderPipeline = m_SimulationMetadata.renderPipeline,
+                    totalFrames = m_TotalFrames
+                };
+
+                consumerEndpoint.OnSimulationCompleted(metadata);
+            }
+        }
+
+        public void End()
+        {
+            if (_Ids.Count == 0)
+                return;
+
+
+//            while (m_PendingFrames.Count > 0)
+//            {
+                WritePendingCaptures(true, true);
+//            }
+
+            if (m_PendingFrames.Count > 0)
+                Debug.LogError($"Simulation ended with {m_PendingFrames.Count} pending annotations, final one is: ({m_PendingFrames.Last().Key.Sequence},{m_PendingFrames.Last().Key.Step})");
+
+#if false
+            WritePendingMetrics(true);
+            if (m_PendingMetrics.Count > 0)
+                Debug.LogError($"Simulation ended with pending metrics: {string.Join(", ", m_PendingMetrics.Select(c => $"id:{c.MetricId} step:{c.Step}"))}");
+#endif
+            if (m_AdditionalInfoTypeData.Any())
+            {
+                List<IdLabelConfig.LabelEntrySpec> labels = new List<IdLabelConfig.LabelEntrySpec>();
+
+                foreach (var infoTypeData in m_AdditionalInfoTypeData)
+                {
+                    if (infoTypeData.specValues == null) continue;
+
+                    foreach (var spec in infoTypeData.specValues)
+                    {
+                        if (spec is IdLabelConfig.LabelEntrySpec entrySpec)
+                        {
+                            labels.Add(entrySpec);
+                        }
+                    }
+
+//                    Debug.Log($"adt: {infoTypeData}");
+
+                }
+            }
+
+//            WriteReferences();
+            Time.captureDeltaTime = 0;
+            IsRunning = false;
+
+
+        }
+#endif
         public void RegisterAnnotationDefinition(AnnotationDefinition definition)
         {
             definition.id = RegisterId(definition.id);
-            GetActiveConsumer()?.OnAnnotationRegistered(definition);
+            consumerEndpoint.OnAnnotationRegistered(definition);
         }
 
         public void RegisterMetric(MetricDefinition definition)
         {
             definition.id = RegisterId(definition.id);
-            GetActiveConsumer()?.OnMetricRegistered(definition);
+            consumerEndpoint.OnMetricRegistered(definition);
         }
 
         void RegisterAdditionalInfoType<TSpec>(string name, TSpec[] specValues, string description, string format, Guid id, AdditionalInfoKind additionalInfoKind)
@@ -933,34 +1041,34 @@ namespace UnityEngine.Perception.GroundTruth
             m_AdditionalInfoTypeData.Add(annotationDefinitionInfo);
         }
 
-        public SPendingSensorId ReportSensor(SensorDefinition definition, Sensor sensor)
+        public PendingSensorId ReportSensor(SensorHandle handle, Sensor sensor)
         {
             var step = AcquireStep();
-            var pendingSensorId = new SPendingSensorId(definition.id, m_SequenceId, step);
+            var pendingSensorId = new PendingSensorId(handle.Id, m_SequenceId, step);
             var pendingFrame = GetOrCreatePendingFrame(pendingSensorId.AsFrameId());
             pendingFrame.sensors[pendingSensorId] = new PendingSensor(pendingSensorId, sensor);
             return pendingSensorId;
         }
 
-        public SPendingCaptureId ReportAnnotation(SensorHandle sensorHandle, AnnotationDefinition definition, Annotation annotation)
+        public PendingCaptureId ReportAnnotation(SensorHandle sensorHandle, AnnotationDefinition definition, Annotation annotation)
         {
             var step = AcquireStep();
-            var sensorId = new SPendingCaptureId(sensorHandle.Id, definition.id, m_SequenceId, step);
+            var sensorId = new PendingCaptureId(sensorHandle.Id, definition.id, m_SequenceId, step);
             var pendingFrame = GetOrCreatePendingFrame(sensorId.AsFrameId());
 
             var sensor = pendingFrame.GetOrCreatePendingSensor(sensorId.SensorId);
 
-            var annotationId = new SPendingCaptureId(sensorHandle.Id, definition.id, m_SequenceId, step);
+            var annotationId = new PendingCaptureId(sensorHandle.Id, definition.id, m_SequenceId, step);
             sensor.Annotations[annotationId] = annotation;
             return annotationId;
         }
 
-        PendingFrame GetOrCreatePendingFrame(SPendingFrameId pendingId)
+        PendingFrame GetOrCreatePendingFrame(PendingFrameId pendingId)
         {
             return GetOrCreatePendingFrame(pendingId, out var _);
         }
 
-        PendingFrame GetOrCreatePendingFrame(SPendingFrameId pendingId, out bool created)
+        PendingFrame GetOrCreatePendingFrame(PendingFrameId pendingId, out bool created)
         {
             created = false;
             m_GetOrCreatePendingCaptureForThisFrameSampler.Begin();
@@ -968,7 +1076,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             if (!m_PendingFrames.TryGetValue(pendingId, out var pendingFrame))
             {
-                pendingFrame = new PendingFrame(pendingId, SequenceTime);
+                pendingFrame = new PendingFrame(pendingId, SequenceTime, this);
                 m_PendingFrames[pendingId] = pendingFrame;
                 m_PendingIdToFrameMap[pendingId] = Time.frameCount;
                 created = true;
@@ -983,9 +1091,9 @@ namespace UnityEngine.Perception.GroundTruth
             return new AsyncAnnotationFuture(ReportAnnotation(sensorHandle, annotationDefinition, null), this);
         }
 
-        public AsyncSensorFuture ReportSensorAsync(SensorDefinition sensorDefinition)
+        public AsyncSensorFuture ReportSensorAsync(SensorHandle handle)
         {
-            return new AsyncSensorFuture(ReportSensor(sensorDefinition, null), this);
+            return new AsyncSensorFuture(ReportSensor(handle, null), this);
         }
 
         public bool IsPending<T>(IAsyncFuture<T> asyncFuture) where T : IPendingId
@@ -1000,7 +1108,7 @@ namespace UnityEngine.Perception.GroundTruth
             return GetPendingFrame(future.GetId().AsFrameId());
         }
 
-        PendingFrame GetPendingFrame(SPendingFrameId id)
+        PendingFrame GetPendingFrame(PendingFrameId id)
         {
             return m_PendingFrames[id];
         }
@@ -1039,12 +1147,12 @@ namespace UnityEngine.Perception.GroundTruth
             return new AsyncMetricFuture(pendingId, this);
         }
 
-        public SPendingCaptureId ReportMetric(SensorHandle sensor, MetricDefinition definition, Metric metric, AnnotationHandle annotation)
+        public PendingCaptureId ReportMetric(SensorHandle sensor, MetricDefinition definition, Metric metric, AnnotationHandle annotation)
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(metric));
 
-            var pendingId = new SPendingCaptureId(sensor.Id, definition.id, m_SequenceId, AcquireStep());
+            var pendingId = new PendingCaptureId(sensor.Id, definition.id, m_SequenceId, AcquireStep());
             var pendingFrame = GetOrCreatePendingFrame(pendingId.AsFrameId());
 
             if (pendingFrame == null)

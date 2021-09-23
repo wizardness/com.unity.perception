@@ -34,7 +34,7 @@ namespace UnityEngine.Perception.GroundTruth
         {
             m_SerializeCapturesSampler.Begin();
 
-            var pendingFramesToWrite = new List<KeyValuePair<SPendingFrameId,PendingFrame>>(m_PendingFrames.Count);
+            var pendingFramesToWrite = new List<KeyValuePair<PendingFrameId,PendingFrame>>(m_PendingFrames.Count);
             var currentFrame = Time.frameCount;
 
             foreach (var frame in m_PendingFrames)
@@ -77,13 +77,30 @@ namespace UnityEngine.Perception.GroundTruth
                 return frame;
             }
 
-            void Write(List<KeyValuePair<SPendingFrameId, PendingFrame>> frames, SimulationState simulationState)
+            void Write(List<KeyValuePair<PendingFrameId, PendingFrame>> frames, SimulationState simulationState)
             {
+#if true
+                // TODO this needs to be done properly, we need to wait on all of the frames to come back so we
+                // can report them, right now we are just going to jam up this thread waiting for them, also could
+                // result in an endless loop if the frame never comes back
+                while (frames.Any())
+                {
+                    var frame = frames.First();
+                    if (frame.Value.IsReadyToReport())
+                    {
+                        frames.Remove(frame);
+                        var converted = ConvertToFrameData(frame.Value, simulationState);
+                        m_TotalFrames++;
+                        consumerEndpoint.OnFrameGenerated(converted);
+                    }
+                }
+#else
                 foreach (var pendingFrame in frames)
                 {
                     var frame = ConvertToFrameData(pendingFrame.Value, simulationState);
                     GetActiveConsumer()?.OnFrameGenerated(frame);
                 }
+#endif
             }
 
             if (flush)
@@ -112,7 +129,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         struct WritePendingCaptureRequestData
         {
-            public List<KeyValuePair<SPendingFrameId, PendingFrame>> PendingFrames;
+            public List<KeyValuePair<PendingFrameId, PendingFrame>> PendingFrames;
             public SimulationState SimulationState;
         }
     }
