@@ -198,7 +198,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 #endif
             var outRgb = ToSensorHeader(frame, sensor);
             outRgb["fileName"] = path;
-            outRgb["imageFormat"] = sensor.imageFormat;
+            outRgb["imageFormat"] = sensor.imageFormat.ToString();
             outRgb["dimension"] = FromVector2(sensor.dimension);
 
             var annotations = new JArray();

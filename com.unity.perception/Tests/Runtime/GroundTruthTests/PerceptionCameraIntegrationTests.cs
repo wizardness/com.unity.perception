@@ -22,23 +22,23 @@ namespace GroundTruthTests
         [UnityPlatform(RuntimePlatform.LinuxPlayer, RuntimePlatform.WindowsPlayer)]
         public IEnumerator EnableBoundingBoxes_GeneratesCorrectDataset()
         {
-            #if false
             //set resolution to ensure we don't have rounding in rendering leading to bounding boxes to change height/width
             Screen.SetResolution(400, 400, false);
             //give the screen a chance to resize
             yield return null;
 
-            var jsonExpected = $@"[
-            {{
-              ""label_id"": 100,
-              ""label_name"": ""label"",
-              ""instance_id"": 1,
-              ""x"": 0.0,
-              ""y"": {Screen.height / 4:F1},
-              ""width"": {Screen.width:F1},
-              ""height"": {Screen.height / 2:F1}
-            }}
-          ]";
+          //   var jsonExpected = $@"[
+          //   {{
+          //     ""label_id"": 100,
+          //     ""label_name"": ""label"",
+          //     ""instance_id"": 1,
+          //     ""x"": 0.0,
+          //     ""y"": {Screen.height / 4:F1},
+          //     ""width"": {Screen.width:F1},
+          //     ""height"": {Screen.height / 2:F1}
+          //   }}
+          // ]";
+
             var labelingConfiguration = CreateLabelingConfiguration();
             SetupCamera(pc =>
             {
@@ -57,18 +57,32 @@ namespace GroundTruthTests
             plane2.transform.localScale = new Vector3(.1f, -1f, .1f);
             plane2.transform.localPosition = new Vector3(0, 0, 5);
             yield return null;
-            DatasetCapture.ResetSimulation();
 
-            var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
-            var capturesJson = File.ReadAllText(capturesPath);
-            StringAssert.Contains(TestHelper.NormalizeJson(jsonExpected, true), TestHelper.NormalizeJson(capturesJson, true));
-#endif
-            yield return null;
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+
+            DatasetCapture.Instance.automaticShutdown = false;
+
+            DatasetCapture.Instance.ResetSimulation();
+
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            // TODO what do I check here
+            Assert.NotZero(0);
+
+
+            // var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
+            // var capturesJson = File.ReadAllText(capturesPath);
+            // StringAssert.Contains(TestHelper.NormalizeJson(jsonExpected, true), TestHelper.NormalizeJson(capturesJson, true));
         }
-#if false
+
         [UnityTest]
         public IEnumerator EnableSemanticSegmentation_GeneratesCorrectDataset([Values(true, false)] bool enabled)
         {
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+            DatasetCapture.Instance.automaticShutdown = false;
 
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>
@@ -81,24 +95,35 @@ namespace GroundTruthTests
 
             this.AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
             yield return null;
-            DatasetCapture.ResetSimulation();
+            DatasetCapture.Instance.ResetSimulation();
 
-            if (enabled)
-            {
-                var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
-                var capturesJson = File.ReadAllText(capturesPath);
-                var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
-                StringAssert.Contains(imagePath, capturesJson);
-            }
-            else
-            {
-                DirectoryAssert.DoesNotExist(DatasetCapture.OutputDirectory);
-            }
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            // What should I test for here...
+
+            Assert.NotZero(0);
+
+            // if (enabled)
+            // {
+            //     var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
+            //     var capturesJson = File.ReadAllText(capturesPath);
+            //     var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
+            //     StringAssert.Contains(imagePath, capturesJson);
+            // }
+            // else
+            // {
+            //     DirectoryAssert.DoesNotExist(DatasetCapture.OutputDirectory);
+            // }
         }
 
         [UnityTest]
         public IEnumerator Disabled_GeneratesCorrectDataset()
         {
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+            DatasetCapture.Instance.automaticShutdown = false;
+
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>
             {
@@ -110,12 +135,19 @@ namespace GroundTruthTests
 
             this.AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
             yield return null;
-            DatasetCapture.ResetSimulation();
+            DatasetCapture.Instance.ResetSimulation();
 
-            var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
-            var capturesJson = File.ReadAllText(capturesPath);
-            var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
-            StringAssert.Contains(imagePath, capturesJson);
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            // What should I test for here...
+
+            Assert.NotZero(0);
+
+            // var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
+            // var capturesJson = File.ReadAllText(capturesPath);
+            // var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
+            // StringAssert.Contains(imagePath, capturesJson);
         }
 
         static IdLabelConfig CreateLabelingConfiguration()
@@ -148,6 +180,5 @@ namespace GroundTruthTests
             });
             return labelingConfiguration;
         }
-#endif
     }
 }

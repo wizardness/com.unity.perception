@@ -170,7 +170,6 @@ namespace GroundTruthTests
             boundingBoxes.Dispose();
             cache.Dispose();
         }
-#if false
 
         [UnityTest]
         public IEnumerator LabelsCorrectWhenIdsReset()
@@ -189,7 +188,7 @@ namespace GroundTruthTests
                 Debug.Log($"Bounding boxes received. FrameCount: {eventArgs.frameCount}");
 
                 Assert.AreEqual(1, eventArgs.data.Count());
-                Assert.AreEqual(expectedLabelIdAtFrame[eventArgs.frameCount], eventArgs.data.First().label_id);
+                Assert.AreEqual(expectedLabelIdAtFrame[eventArgs.frameCount], eventArgs.data.First().labelId);
             }
 
             var idLabelConfig = ScriptableObject.CreateInstance<IdLabelConfig>();
@@ -246,7 +245,7 @@ namespace GroundTruthTests
 
             Assert.AreEqual(3, timesInfoReceived);
         }
-#endif
+
         private GameObject SetupCameraBoundingBox2D(Action<BoundingBox2DLabeler.BoundingBoxesCalculatedEventArgs> onBoundingBoxesCalculated, IdLabelConfig idLabelConfig)
         {
             var cameraObject = SetupCamera(camera =>

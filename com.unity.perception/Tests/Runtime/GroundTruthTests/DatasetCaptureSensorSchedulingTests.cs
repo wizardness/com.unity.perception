@@ -23,7 +23,7 @@ namespace GroundTruthTests
 
         internal SimulationStateTestHelper()
         {
-            m_State = DatasetCapture.Instance.simulationState;
+            m_State = DatasetCapture.Instance.currentSimulation;
             var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
             m_SequenceTimeOfNextCaptureMethod = m_State.GetType().GetMethod("GetSequenceTimeOfNextCapture", bindingFlags);
             Debug.Assert(m_SequenceTimeOfNextCaptureMethod != null, "Couldn't find sequence time method.");

@@ -57,7 +57,7 @@ namespace UnityEngine.Perception.GroundTruth
         bool m_IsGroundTruthRendererFeaturePresent;
         internal List<ScriptableRenderPass> passes = new List<ScriptableRenderPass>();
 #endif
-        public string ID;
+        public string ID = "camera";
 
         /// <summary>
         /// A human-readable description of the camera.
@@ -448,7 +448,7 @@ namespace UnityEngine.Perception.GroundTruth
                 rotation = transform.eulerAngles,
                 velocity = Vector3.zero,
                 acceleration = Vector3.zero,
-                imageFormat = ".png",
+                imageFormat = RgbSensor.ImageFormat.PNG,
                 dimension = new Vector2(cam.pixelWidth, cam.pixelHeight),
                 buffer = new byte[0]
             };

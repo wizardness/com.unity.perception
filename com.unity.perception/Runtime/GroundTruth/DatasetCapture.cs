@@ -5,6 +5,7 @@ using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.Consumers;
 using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Rendering;
 
 #pragma warning disable 649
 namespace UnityEngine.Perception.GroundTruth
@@ -17,7 +18,8 @@ namespace UnityEngine.Perception.GroundTruth
     {
         static DatasetCapture s_Instance;
 
-        List<SimulationState> m_Simulations = new List<SimulationState>();
+        SimulationState m_ActiveSimulation;
+        List<SimulationState> m_ShuttingDownSimulations = new List<SimulationState>();
 
         public static DatasetCapture Instance => s_Instance ?? (s_Instance = new DatasetCapture());
 
@@ -26,17 +28,22 @@ namespace UnityEngine.Perception.GroundTruth
 
         Type m_ActiveConsumerType = typeof(SoloConsumer);
 
-        bool CanBeShutdown()
+        public bool CanBeShutdown()
         {
             if (m_ReadyToShutdown)
                 Debug.Log("After ready to be shutdown");
 
-            if (m_ReadyToShutdown && m_Simulations.All(s => s.IsNotRunning()))
+            if (m_ReadyToShutdown && m_ActiveSimulation.IsNotRunning() && m_ShuttingDownSimulations.All(s => s.IsNotRunning()))
             {
                 Debug.Log("we here");
             }
 
-            return m_ReadyToShutdown && m_Simulations.All(s => s.IsNotRunning());
+            return m_ReadyToShutdown && m_ActiveSimulation.IsNotRunning() && m_ShuttingDownSimulations.All(s => s.IsNotRunning());
+        }
+
+        public class WaitUntilComplete : CustomYieldInstruction
+        {
+            public override bool keepWaiting => !Instance.CanBeShutdown();
         }
 
         class AllCapturesCompleteShutdownCondition : ICondition
@@ -50,12 +57,40 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
+        bool m_automaticShutdown = true;
+
+        public bool automaticShutdown
+        {
+            get => m_automaticShutdown;
+            set
+            {
+                switch (value)
+                {
+                    case true when !m_automaticShutdown:
+                        Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
+                        break;
+                    case false when m_automaticShutdown:
+                        Manager.Instance.ShutdownCondition = null;
+                        break;
+                }
+
+                m_automaticShutdown = value;
+            }
+
+        }
+
         DatasetCapture()
         {
-            Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
+            if (automaticShutdown)
+                Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
             Manager.Instance.ShutdownNotification += OnApplicationShutdown;
         }
 
+        internal SimulationState currentSimulation
+        {
+            get => m_ActiveSimulation ?? (m_ActiveSimulation = CreateSimulationData());
+        }
+#if false
         internal SimulationState simulationState
         {
             get
@@ -65,7 +100,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
             private set => m_Simulations.Add(value);
         }
-
+#endif
         /// <summary>
         /// The json metadata schema version the DatasetCapture's output conforms to.
         /// </summary>
@@ -80,29 +115,55 @@ namespace UnityEngine.Perception.GroundTruth
 
         public SensorHandle RegisterSensor(SensorDefinition sensor)
         {
-            return simulationState.AddSensor(sensor, sensor.simulationDeltaTime);
+            return currentSimulation.AddSensor(sensor, sensor.simulationDeltaTime);
         }
 
         public void RegisterMetric(MetricDefinition metricDefinition)
         {
-            simulationState.RegisterMetric(metricDefinition);
+            currentSimulation.RegisterMetric(metricDefinition);
         }
 
         public void RegisterAnnotationDefinition(AnnotationDefinition definition)
         {
-            simulationState.RegisterAnnotationDefinition(definition);
+            currentSimulation.RegisterAnnotationDefinition(definition);
         }
 
         /// <summary>
         /// Starts a new sequence in the capture.
         /// </summary>
-        public void StartNewSequence() => simulationState.StartNewSequence();
+        public void StartNewSequence() => currentSimulation.StartNewSequence();
 
-        internal bool IsValid(string id) => simulationState.Contains(id);
+        internal bool IsValid(string id) => currentSimulation.Contains(id);
 
-        SimulationState CreateSimulationData()
+        static ConsumerEndpoint s_Endpoint;
+        static Type s_EndpointType = typeof(SoloConsumer);
+
+        public static void SetEndpoint(ConsumerEndpoint endpoint)
         {
-            return new SimulationState(typeof(SoloConsumer));
+            // TODO I think that we need to do some checking to make sure we're not running
+
+            s_Endpoint = endpoint;
+            Instance.currentSimulation.consumerEndpoint = endpoint;
+        }
+
+        public static bool SetEndpointType(Type inType)
+        {
+            if (inType.IsSubclassOf(typeof(ConsumerEndpoint)))
+            {
+                Debug.Log("Setting endpoint type");
+                s_EndpointType = inType;
+                return true;
+            }
+
+            Debug.Log("Not setting endpoint type");
+            return false;
+        }
+
+        static SimulationState CreateSimulationData()
+        {
+            if (s_Endpoint != null) return new SimulationState(s_Endpoint.GetType());
+            if (s_EndpointType != null) return new SimulationState(s_EndpointType);
+            throw new InvalidOperationException("Dataset capture cannot create a new simulation state without either a valid consumer endpoint or an endpoint type to instantiate.");
         }
 
         [RuntimeInitializeOnLoadMethod]
@@ -121,20 +182,29 @@ namespace UnityEngine.Perception.GroundTruth
 
         public void Update()
         {
-            foreach (var simulation in m_Simulations)
+            currentSimulation.Update();
+
+            foreach (var simulation in m_ShuttingDownSimulations)
             {
                 simulation.Update();
             }
 
-            m_Simulations.RemoveAll(sim => sim.ExecutionState == SimulationState.ExecutionStateType.Complete);
+            m_ShuttingDownSimulations.RemoveAll(sim => sim.ExecutionState == SimulationState.ExecutionStateType.Complete);
         }
 
         public void ResetSimulation()
         {
             SimulationEnding?.Invoke();
-            simulationState.End();
-            simulationState = CreateSimulationData();
-            m_ReadyToShutdown = true;
+
+            if (m_ActiveSimulation.IsRunning())
+            {
+                var old = m_ActiveSimulation;
+                m_ShuttingDownSimulations.Add(old);
+                old.End();
+                m_ReadyToShutdown = true;
+            }
+
+            m_ActiveSimulation = CreateSimulationData();
         }
     }
 
@@ -150,6 +220,9 @@ namespace UnityEngine.Perception.GroundTruth
         T GetId();
 
         FutureType GetFutureType();
+
+        bool IsValid();
+
         bool IsPending();
     }
 
@@ -172,6 +245,11 @@ namespace UnityEngine.Perception.GroundTruth
         public FutureType GetFutureType()
         {
             return FutureType.Sensor;
+        }
+
+        public bool IsValid()
+        {
+            return m_SimulationState.IsRunning();
         }
 
         public bool IsPending()
@@ -206,6 +284,11 @@ namespace UnityEngine.Perception.GroundTruth
             return FutureType.Annotation;
         }
 
+        public bool IsValid()
+        {
+            return m_SimulationState.IsRunning();
+        }
+
         public bool IsPending()
         {
             return m_SimulationState.IsPending(this);
@@ -238,6 +321,11 @@ namespace UnityEngine.Perception.GroundTruth
             return FutureType.Metric;
         }
 
+        public bool IsValid()
+        {
+            return m_SimulationState.IsRunning();
+        }
+
         public bool IsPending()
         {
             return m_SimulationState.IsPending(this);
@@ -267,11 +355,11 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public bool Enabled
         {
-            get => DatasetCapture.Instance.simulationState.IsEnabled(this);
+            get => DatasetCapture.Instance.currentSimulation.IsEnabled(this);
             set
             {
                 CheckValid();
-                DatasetCapture.Instance.simulationState.SetEnabled(this, value);
+                DatasetCapture.Instance.currentSimulation.SetEnabled(this, value);
             }
         }
 
@@ -282,7 +370,7 @@ namespace UnityEngine.Perception.GroundTruth
             if (!definition.IsValid())
                 throw new ArgumentException("The given annotationDefinition is invalid", nameof(definition));
 
-            DatasetCapture.Instance.simulationState.ReportAnnotation(this, definition, annotation);
+            DatasetCapture.Instance.currentSimulation.ReportAnnotation(this, definition, annotation);
         }
 
         /// <summary>
@@ -299,7 +387,7 @@ namespace UnityEngine.Perception.GroundTruth
             if (!annotationDefinition.IsValid())
                 throw new ArgumentException("The given annotationDefinition is invalid", nameof(annotationDefinition));
 
-            return DatasetCapture.Instance.simulationState.ReportAnnotationAsync(annotationDefinition, this);
+            return DatasetCapture.Instance.currentSimulation.ReportAnnotationAsync(annotationDefinition, this);
         }
 
         public AsyncSensorFuture ReportSensorAsync()
@@ -309,7 +397,7 @@ namespace UnityEngine.Perception.GroundTruth
             if (!IsValid)
                 throw new ArgumentException($"The given annotationDefinition is invalid {Id}");
 
-            return DatasetCapture.Instance.simulationState.ReportSensorAsync(this);
+            return DatasetCapture.Instance.currentSimulation.ReportSensorAsync(this);
         }
 
         public void ReportSensor(Sensor sensor)
@@ -319,22 +407,34 @@ namespace UnityEngine.Perception.GroundTruth
             if (!IsValid)
                 throw new ArgumentException("The given annotationDefinition is invalid", Id);
 
-           DatasetCapture.Instance.simulationState.ReportSensor(this, sensor);
+           DatasetCapture.Instance.currentSimulation.ReportSensor(this, sensor);
         }
 
         /// <summary>
         /// Whether the sensor should capture this frame. Sensors are expected to call this method each frame to determine whether
         /// they should capture during the frame. Captures should only be reported when this is true.
         /// </summary>
-        public bool ShouldCaptureThisFrame => DatasetCapture.Instance.simulationState.ShouldCaptureThisFrame(this);
+        public bool ShouldCaptureThisFrame => DatasetCapture.Instance.currentSimulation.ShouldCaptureThisFrame(this);
 
         /// <summary>
         /// Requests a capture from this sensor on the next rendered frame. Can only be used with manual capture mode (<see cref="CaptureTriggerMode.Manual"/>).
         /// </summary>
         public void RequestCapture()
         {
-            DatasetCapture.Instance.simulationState.SetNextCaptureTimeToNowForSensor(this);
+            DatasetCapture.Instance.currentSimulation.SetNextCaptureTimeToNowForSensor(this);
         }
+
+        public void ReportMetric(MetricDefinition definition, Metric metric)
+        {
+            if (!ShouldCaptureThisFrame)
+                throw new InvalidOperationException("Annotation reported on SensorHandle in frame when its ShouldCaptureThisFrame is false.");
+            if (!IsValid)
+                throw new ArgumentException("The given annotationDefinition is invalid", Id);
+
+            DatasetCapture.Instance.currentSimulation.ReportMetric(this, definition, metric);
+        }
+
+
 #if false
         public MetricHandle ReportMetric(MetricDefinition definition, Metric metric)
         {
@@ -360,7 +460,7 @@ namespace UnityEngine.Perception.GroundTruth
             if (!metricDefinition.IsValid())
                 throw new ArgumentException("The passed in metric definition is invalid", nameof(metricDefinition));
 
-            return DatasetCapture.Instance.simulationState.CreateAsyncMetric(metricDefinition, this);
+            return DatasetCapture.Instance.currentSimulation.CreateAsyncMetric(metricDefinition, this);
         }
 
         /// <summary>

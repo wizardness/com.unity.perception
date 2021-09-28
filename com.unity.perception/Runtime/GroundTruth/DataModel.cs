@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 
 namespace UnityEngine.Perception.GroundTruth.DataModel
@@ -130,13 +131,13 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     [Serializable]
     public class Frame : IMessageProducer
     {
-        public Frame(int frame, int sequence, int step)
+        public Frame(int frame, int sequence, int step, float timestamp)
         {
             this.frame = frame;
             this.sequence = sequence;
             this.step = step;
+            this.timestamp = timestamp;
             sensors = new List<Sensor>();
-
         }
 
         /// <summary>
@@ -251,8 +252,15 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     [Serializable]
     public class RgbSensor : Sensor
     {
+        public enum ImageFormat
+        {
+            PNG
+        };
+
+        public float3x3 intrinsics;
+
         // The format of the image type
-        public string imageFormat;
+        public ImageFormat imageFormat;
 
         // The dimensions (width, height) of the image
         public Vector2 dimension;
@@ -263,7 +271,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         public override void ToMessage(IMessageBuilder builder)
         {
             base.ToMessage(builder);
-            builder.AddString("image_format", imageFormat);
+            builder.AddString("image_format", imageFormat.ToString());
             builder.AddFloatVector("dimension", Utils.ToFloatVector(dimension));
             builder.AddPngImage("camera", buffer);
         }
@@ -274,9 +282,18 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     /// annotations. Concrete instances of this class will add
     /// data for their specific annotation type.
     /// </summary>
-    [Serializable]
     public abstract class Annotation : IMessageProducer
     {
+        public Annotation() {}
+
+        public Annotation(string id, string sensorId, string description, string annotationType)
+        {
+            this.Id = id;
+            this.sensorId = sensorId;
+            this.description = description;
+            this.annotationType = annotationType;
+        }
+
         /// <summary>
         /// The unique, human readable ID for the annotation.
         /// </summary>
@@ -327,11 +344,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         /// A human readable description of what this metric is for.
         /// </summary>
         public string description;
-        /// <summary>
-        /// Additional key/value pair metadata that can be associated with
-        /// any metric.
-        /// </summary>
-        public Dictionary<string, object> metadata;
+
         public virtual void ToMessage(IMessageBuilder builder)
         {
             builder.AddString("id", Id);
@@ -351,7 +364,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         public SimulationMetadata()
         {
             unityVersion = "not_set";
-            perceptionVersion = "0.8.0-preview.4";
+            perceptionVersion = "not_set";
 #if HDRP_PRESENT
             renderPipeline = "HDRP";
 #elif URP_PRESENT

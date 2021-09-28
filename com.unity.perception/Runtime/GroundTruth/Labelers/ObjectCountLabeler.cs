@@ -184,7 +184,6 @@ namespace UnityEngine.Perception.GroundTruth
                     sensorId = "",
                     annotationId = default,
                     description = m_Definition.description,
-                    metadata = new Dictionary<string, object>(),
                     objectCounts = m_ClassCountValues
                 };
                 classCountAsyncMetric.Report(payload);

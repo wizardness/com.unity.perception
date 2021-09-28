@@ -7,6 +7,7 @@ using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.TestTools;
 
 namespace GroundTruthTests
