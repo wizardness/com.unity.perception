@@ -345,6 +345,11 @@ namespace UnityEngine.Perception.GroundTruth
             Id = id ?? string.Empty;
         }
 
+        public override string ToString()
+        {
+            return Id;
+        }
+
         /// <summary>
         /// Whether the sensor is currently enabled. When disabled, the DatasetCapture will no longer schedule frames for running captures on this sensor.
         /// </summary>

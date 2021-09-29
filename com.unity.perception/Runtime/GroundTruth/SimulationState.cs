@@ -691,7 +691,7 @@ namespace UnityEngine.Perception.GroundTruth
                 modality = sensor.modality,
                 description = sensor.definition,
                 firstCaptureTime = UnscaledSequenceTime + sensor.firstCaptureFrame * renderingDeltaTime,
-                captureTriggerMode = CaptureTriggerMode.Scheduled, // TODO fix this
+                captureTriggerMode = sensor.captureTriggerMode,
                 renderingDeltaTime = renderingDeltaTime,
                 framesBetweenCaptures = sensor.framesBetweenCaptures,
                 manualSensorAffectSimulationTiming = sensor.manualSensorsAffectTiming,
@@ -989,7 +989,10 @@ namespace UnityEngine.Perception.GroundTruth
         public void SetNextCaptureTimeToNowForSensor(SensorHandle sensorHandle)
         {
             if (!m_Sensors.ContainsKey(sensorHandle))
+            {
+                Debug.LogError($"Tried to set a capture time for an unregistered sensor: {sensorHandle}");
                 return;
+            }
 
             var data = m_Sensors[sensorHandle];
             data.sequenceTimeOfNextCapture = UnscaledSequenceTime;
@@ -1073,7 +1076,7 @@ namespace UnityEngine.Perception.GroundTruth
 // This is just here for debug reasons, this here will always report errors, but they get cleaned up in shutdown
 //            VerifyNoMorePendingFrames();
 
-
+            Time.captureDeltaTime = 0;
             ExecutionState = ExecutionStateType.ShuttingDown;
         }
 #endif

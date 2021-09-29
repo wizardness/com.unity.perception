@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Unity.Mathematics;
+using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.DataModel;
@@ -23,6 +24,7 @@ namespace GroundTruthTests
 
         internal SimulationStateTestHelper()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
             m_State = DatasetCapture.Instance.currentSimulation;
             var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
             m_SequenceTimeOfNextCaptureMethod = m_State.GetType().GetMethod("GetSequenceTimeOfNextCapture", bindingFlags);
@@ -62,14 +64,15 @@ namespace GroundTruthTests
             DatasetCapture.Instance.ResetSimulation();
         }
 
-        SensorDefinition CreateSensorDefinition(string id, string modality, string def, int firstFrame, CaptureTriggerMode mode, float deltaTime, int framesBetween)
+        SensorDefinition CreateSensorDefinition(string id, string modality, string def, int firstFrame, CaptureTriggerMode mode, float deltaTime, int framesBetween, bool manualSensorAffectSimulationTiming = false)
         {
             return new SensorDefinition(id, modality, def)
             {
                 firstCaptureFrame = firstFrame,
                 captureTriggerMode = mode,
                 simulationDeltaTime = deltaTime,
-                framesBetweenCaptures = framesBetween
+                framesBetweenCaptures = framesBetween,
+                manualSensorsAffectTiming = manualSensorAffectSimulationTiming
             };
         }
 
@@ -268,7 +271,7 @@ namespace GroundTruthTests
             DatasetCapture.Instance.ResetSimulation();
             Assert.AreEqual(0, Time.captureDeltaTime);
         }
-#if false
+#if true
         [UnityTest]
         public IEnumerator ShouldCaptureFlagsAndRenderTimesAreCorrectWithMultipleSensors()
         {
@@ -284,7 +287,7 @@ namespace GroundTruthTests
 
             //Third sensor is a manually triggered one. All it does in this test is affect delta times.
             var simDeltaTime3 = 5;
-            var sensor3 = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam3", "", "", 0, CaptureTriggerMode.Manual, simDeltaTime3, 0)); // why is there a true on this one
+            var sensor3 = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam3", "", "", 0, CaptureTriggerMode.Manual, simDeltaTime3, 0, true));
 
             (float deltaTime, bool sensor1ShouldCapture, bool sensor2ShouldCapture, bool sensor3ShouldCapture)[] samplesExpected =
             {
@@ -318,6 +321,7 @@ namespace GroundTruthTests
         [TestCase(235, 10, 2350, 2585, 2820, 3055, ExpectedResult = (IEnumerator)null)]
         public IEnumerator SequenceTimeOfNextCapture_ReportsCorrectTime_VariedDeltaTimesAndStartFrames(float simulationDeltaTime, int firstCaptureFrame, float firstCaptureTime, float secondCaptureTime, float thirdCaptureTime, float fourthCaptureTime)
         {
+
             var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             float[] sequenceTimesExpected =
@@ -341,12 +345,16 @@ namespace GroundTruthTests
                 Assert.AreEqual(sequenceTimesExpected[i], sequenceTimeActual, 0.0001f);
                 yield return null;
             }
+
+//            DatasetCapture.Instance.ResetSimulation();
+//            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+//            yield return dcWatcher;
         }
-#if false
+#if true
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorDoesNotAffectTimings()
         {
-            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, 0, 0)); // why is there supposed to be a falise at the end of this
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, 0, 0, false));
 
             var framesToCaptureOn = new List<int>();
 
@@ -377,18 +385,26 @@ namespace GroundTruthTests
                     var elapsed = Time.time - startTime;
                     Assert.AreEqual(elapsed, sequenceTimeActual, 0.0001f);
                 }
+
+                if (Time.frameCount > 1000)
+                {
+                    Debug.Log("Pulling the eject handle");
+                    yield break;
+                }
+
                 yield return null;
             }
 
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
         }
 #endif
-#if false
+
+#if true
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorAffectsTimings()
         {
             var simulationDeltaTime = 0.05f;
-            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, simulationDeltaTime, 0)); // why was there a true here...
+            var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, simulationDeltaTime, 0, true));
 
             var framesToCaptureOn = new List<int>();
 
@@ -425,6 +441,13 @@ namespace GroundTruthTests
                     Assert.AreEqual(sequenceTimesExpected[frameIndex], sequenceTimeActual, 0.0001f);
                     frameIndex++;
                 }
+
+                if (Time.frameCount > 1000)
+                {
+                    Debug.Log("Pulling the eject handle");
+                    yield break;
+                }
+
                 yield return null;
             }
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
