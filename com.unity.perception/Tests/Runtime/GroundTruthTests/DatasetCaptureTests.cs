@@ -125,23 +125,72 @@ namespace GroundTruthTests
             Assert.AreEqual(sensor.framesBetweenCaptures, framesBetween);
         }
 
-        [UnityTest]
-        public IEnumerator ReportCapture_ReportsProperJson()
+        RgbSensor CreateMocRgbCapture()
         {
             var position = new float3(.2f, 1.1f, .3f);
             var rotation = new Quaternion(.3f, .2f, .1f, .5f);
             var velocity = new Vector3(.1f, .2f, .3f);
             var intrinsics = new float3x3(.1f, .2f, .3f, 1f, 2f, 3f, 10f, 20f, 30f);
 
-            var sensor = new RgbSensor
+            return new RgbSensor
             {
                 position = position,
                 rotation = rotation.eulerAngles,
                 velocity = velocity,
                 intrinsics = intrinsics
             };
+        }
 
+        [UnityTest]
+        public IEnumerator ReportCaptureAsync_TimesOut()
+        {
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+            DatasetCapture.Instance.automaticShutdown = false;
+            SimulationState.TimeOutFrameCount = 5;
+
+            var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
+            var f = sensorHandle.ReportSensorAsync();
+
+            for (var i = 0; i <= SimulationState.TimeOutFrameCount; i++) yield return null;
+
+            DatasetCapture.Instance.ResetSimulation();
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            LogAssert.Expect(LogType.Error, new Regex("A frame has timed out and is being removed.*"));
+            SimulationState.TimeOutFrameCount = 6000;
+        }
+
+        [UnityTest]
+        public IEnumerator ReportCaptureAsync_DoesNotTimeOut()
+        {
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+            DatasetCapture.Instance.automaticShutdown = false;
+            SimulationState.TimeOutFrameCount = 5;
+
+            var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
+            var f = sensorHandle.ReportSensorAsync();
+
+            yield return null;
+            yield return null;
+
+            f.Report(CreateMocRgbCapture());
+
+            DatasetCapture.Instance.ResetSimulation();
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            Assert.AreEqual(1, collector.currentRun.frames.Count);
+            SimulationState.TimeOutFrameCount = 6000;
+        }
+
+        [UnityTest]
+        public IEnumerator ReportCapture_ReportsProperJson()
+        {
             var sensorHandle = RegisterSensor("camera", "camera", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
+            var sensor = CreateMocRgbCapture();
             sensorHandle.ReportSensor(sensor);
 
             var collector = new CollectEndpoint();
@@ -344,18 +393,26 @@ namespace GroundTruthTests
             Assert.AreEqual(20, tAnn.entries[1].b);
         }
 
-        [Test]
-        public void ReportAnnotationFile_WhenCaptureNotExpected_Throws()
+        [UnityTest]
+        public IEnumerator ReportAnnotationFile_WhenCaptureNotExpected_Throws()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
             var sensorHandle = RegisterSensor("camera", "", "", 100, CaptureTriggerMode.Scheduled, 1, 0);
             Assert.Throws<InvalidOperationException>(() => sensorHandle.ReportAnnotation(def, null));
+
+            DatasetCapture.Instance.ResetSimulation();
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
         }
 
         [Test]
         public void ReportAnnotationValues_WhenCaptureNotExpected_Throws()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
             var ann = new TestAnnotation()
@@ -368,6 +425,7 @@ namespace GroundTruthTests
             };
             var sensorHandle = RegisterSensor("camera", "", "", 100, CaptureTriggerMode.Scheduled, 1, 0);
             Assert.Throws<InvalidOperationException>(() => sensorHandle.ReportAnnotation(def, ann));
+            DatasetCapture.Instance.ResetSimulation();
         }
 
         [Test]
@@ -423,14 +481,38 @@ namespace GroundTruthTests
         }
 
         [UnityTest]
+        public IEnumerator AnnotationAsyncInvalid_TimesOut()
+        {
+            var collector = new CollectEndpoint();
+            DatasetCapture.SetEndpoint(collector);
+            DatasetCapture.Instance.automaticShutdown = false;
+
+            SimulationState.TimeOutFrameCount = 100;
+
+            var def = new TestDef();
+            DatasetCapture.Instance.RegisterAnnotationDefinition(def);
+            var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
+            var asyncAnnotation = sensorHandle.ReportAnnotationAsync(def);
+            Assert.IsTrue(asyncAnnotation.IsValid());
+
+            DatasetCapture.Instance.ResetSimulation();
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
+            LogAssert.Expect(LogType.Error, new Regex("A frame has timed out and is being removed.*"));
+            Assert.IsFalse(asyncAnnotation.IsValid());
+        }
+
+        [UnityTest]
         public IEnumerator AnnotationAsyncIsValid_ReturnsProperValue()
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-
             DatasetCapture.Instance.automaticShutdown = false;
 
-            LogAssert.ignoreFailingMessages = true; //we aren't worried about "Simulation ended with pending..."
+            SimulationState.TimeOutFrameCount = 10;
+
+            LogAssert.ignoreFailingMessages = true; //we are not worried about timing out
 
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
@@ -443,6 +525,7 @@ namespace GroundTruthTests
             yield return dcWatcher;
 
             Assert.IsFalse(asyncAnnotation.IsValid());
+            SimulationState.TimeOutFrameCount = 6000;
         }
 
         [UnityTest]

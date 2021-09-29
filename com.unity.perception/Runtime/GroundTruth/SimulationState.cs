@@ -13,7 +13,7 @@ namespace UnityEngine.Perception.GroundTruth
 {
     public class SimulationState
     {
-        public static int TimeOutFrameCount = 60;
+        public static int TimeOutFrameCount = 100;
 
         public enum ExecutionStateType
         {
@@ -785,26 +785,31 @@ namespace UnityEngine.Perception.GroundTruth
             // If there aren't any sensors then we are currently stateless?
             if (ExecutionState == ExecutionStateType.NotStarted)
             {
+                Debug.Log("SS - Not Started");
                 return;
             }
 
             if (ExecutionState == ExecutionStateType.Starting)
             {
+                Debug.Log("SS - Starting");
                 UpdateStarting();
             }
 
             if (ExecutionState == ExecutionStateType.Running)
             {
+                Debug.Log("SS - Running");
                 UpdateRunning();
             }
 
             if (ExecutionState == ExecutionStateType.ShuttingDown)
             {
+                Debug.Log("SS - Shutting Down");
                 UpdateShuttdingDown();
             }
 
-            if (ExecutionState == ExecutionStateType.NotStarted)
+            if (ExecutionState == ExecutionStateType.Complete)
             {
+                Debug.Log("SS - Complete");
                 UpdateComplete();
             }
         }
@@ -1317,7 +1322,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             foreach (var pf in timedOutFrames)
             {
-                Debug.LogError($"Frame {pf.Key} timed out");
+                Debug.LogError($"A frame has timed out and is being removed: [{pf.Key.Sequence},{pf.Key.Step}]");
                 m_PendingFrames.Remove(pf.Key);
             }
 

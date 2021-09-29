@@ -57,7 +57,7 @@ namespace GroundTruthTests
                 Debug.LogError("Current run frames is null, probably means that OnSimulationStarted was never called");
             }
 
-            currentRun.frames.Add(frame);
+            currentRun.frames?.Add(frame);
             Debug.Log("Collect Enpoint OnFrameGenerted");
         }
 

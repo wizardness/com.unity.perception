@@ -268,7 +268,7 @@ namespace GroundTruthTests
             DatasetCapture.Instance.ResetSimulation();
             Assert.AreEqual(0, Time.captureDeltaTime);
         }
-
+#if false
         [UnityTest]
         public IEnumerator ShouldCaptureFlagsAndRenderTimesAreCorrectWithMultipleSensors()
         {
@@ -310,7 +310,7 @@ namespace GroundTruthTests
 
             CollectionAssert.AreEqual(samplesExpected, samplesActual);
         }
-
+#endif
         [UnityTest]
         [TestCase(1, 0, 0, 1, 2, 3, ExpectedResult = (IEnumerator)null)]
         [TestCase(10, 5, 50, 60, 70, 80, ExpectedResult = (IEnumerator)null)]
@@ -342,7 +342,7 @@ namespace GroundTruthTests
                 yield return null;
             }
         }
-
+#if false
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorDoesNotAffectTimings()
         {
@@ -382,7 +382,8 @@ namespace GroundTruthTests
 
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
         }
-
+#endif
+#if false
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorAffectsTimings()
         {
@@ -428,5 +429,6 @@ namespace GroundTruthTests
             }
             Assert.AreEqual(frameIndex, framesToCaptureOn.Count, 0.0001f);
         }
+#endif
     }
 }

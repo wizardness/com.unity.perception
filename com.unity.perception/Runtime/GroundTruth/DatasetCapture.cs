@@ -30,14 +30,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         public bool CanBeShutdown()
         {
-            if (m_ReadyToShutdown)
-                Debug.Log("After ready to be shutdown");
-
-            if (m_ReadyToShutdown && m_ActiveSimulation.IsNotRunning() && m_ShuttingDownSimulations.All(s => s.IsNotRunning()))
-            {
-                Debug.Log("we here");
-            }
-
+            Debug.Log($"DC::CanBeShutdown, ready: {m_ReadyToShutdown}, active: {m_ActiveSimulation.IsNotRunning()}, shutting down #: {m_ShuttingDownSimulations.Count}, shutting down ready: {m_ShuttingDownSimulations.All(s => s.IsNotRunning())}");
             return m_ReadyToShutdown && m_ActiveSimulation.IsNotRunning() && m_ShuttingDownSimulations.All(s => s.IsNotRunning());
         }
 
@@ -81,6 +74,8 @@ namespace UnityEngine.Perception.GroundTruth
 
         DatasetCapture()
         {
+            Debug.Log("Dataset Capture NEW!!!");
+
             if (automaticShutdown)
                 Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
             Manager.Instance.ShutdownNotification += OnApplicationShutdown;

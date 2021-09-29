@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace GroundTruthTests
@@ -13,8 +15,8 @@ namespace GroundTruthTests
     {
         List<Object> m_ObjectsToDestroy = new List<Object>();
         List<string> m_ScenesToUnload = new List<string>();
-        [TearDown]
-        public void TearDown()
+        [UnityTearDown]
+        public IEnumerator TearDown()
         {
             foreach (var o in m_ObjectsToDestroy)
                 Object.DestroyImmediate(o);
@@ -27,6 +29,10 @@ namespace GroundTruthTests
             m_ScenesToUnload.Clear();
 
             DatasetCapture.Instance.ResetSimulation();
+
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
+
             Time.timeScale = 1;
 #if false
             if (Directory.Exists(DatasetCapture.OutputDirectory))
