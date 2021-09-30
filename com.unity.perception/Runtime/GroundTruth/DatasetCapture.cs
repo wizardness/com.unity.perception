@@ -196,8 +196,9 @@ namespace UnityEngine.Perception.GroundTruth
                 var old = m_ActiveSimulation;
                 m_ShuttingDownSimulations.Add(old);
                 old.End();
-                m_ReadyToShutdown = true;
             }
+
+            m_ReadyToShutdown = true;
 
             m_ActiveSimulation = CreateSimulationData();
         }

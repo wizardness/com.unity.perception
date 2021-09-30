@@ -2,9 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
+using UnityEngine.Perception.GroundTruth.DataModel;
 using UnityEngine.TestTools;
 
 #if MOQ_PRESENT
@@ -80,6 +82,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator EnableSemanticSegmentation_GeneratesCorrectDataset([Values(true, false)] bool enabled)
         {
+            SimulationState.TimeOutFrameCount = 50;
+
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
             DatasetCapture.Instance.automaticShutdown = false;
@@ -91,30 +95,29 @@ namespace GroundTruthTests
                 pc.AddLabeler(semanticSegmentationLabeler);
             }, enabled);
 
-            string expectedImageFilename = $"segmentation_{Time.frameCount}.png";
-
-            this.AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
+            AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
             yield return null;
             DatasetCapture.Instance.ResetSimulation();
 
             var dcWatcher = new DatasetCapture.WaitUntilComplete();
             yield return dcWatcher;
 
-            // What should I test for here...
-
-            Assert.NotZero(0);
-
-            // if (enabled)
-            // {
-            //     var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
-            //     var capturesJson = File.ReadAllText(capturesPath);
-            //     var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
-            //     StringAssert.Contains(imagePath, capturesJson);
-            // }
-            // else
-            // {
-            //     DirectoryAssert.DoesNotExist(DatasetCapture.OutputDirectory);
-            // }
+            if (enabled)
+            {
+                Assert.NotNull(collector.currentRun);
+                Assert.AreEqual(1, collector.currentRun.frames.Count);
+                Assert.AreEqual(1, collector.currentRun.frames[0].sensors.Count());
+                var rgb = collector.currentRun.frames[0].sensors.First() as RgbSensor;
+                Assert.NotNull(rgb);
+                Assert.AreEqual(1, rgb.annotations.Count());
+                var ann = rgb.annotations.First() as SemanticSegmentationLabeler.SemanticSegmentation;
+                Assert.NotNull(ann);
+                Assert.NotZero(ann.buffer.Length);
+            }
+            else
+            {
+                Assert.Null(collector.currentRun.frames);
+            }
         }
 
         [UnityTest]
@@ -131,23 +134,22 @@ namespace GroundTruthTests
                 pc.AddLabeler(semanticSegmentationLabeler);
             });
 
-            string expectedImageFilename = $"segmentation_{Time.frameCount}.png";
-
-            this.AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
+            AddTestObjectForCleanup(TestHelper.CreateLabeledPlane());
             yield return null;
             DatasetCapture.Instance.ResetSimulation();
 
             var dcWatcher = new DatasetCapture.WaitUntilComplete();
             yield return dcWatcher;
 
-            // What should I test for here...
-
-            Assert.NotZero(0);
-
-            // var capturesPath = Path.Combine(DatasetCapture.OutputDirectory, "captures_000.json");
-            // var capturesJson = File.ReadAllText(capturesPath);
-            // var imagePath = $"{semanticSegmentationLabeler.semanticSegmentationDirectory}/{expectedImageFilename}";
-            // StringAssert.Contains(imagePath, capturesJson);
+            Assert.NotNull(collector.currentRun);
+            Assert.AreEqual(1, collector.currentRun.frames.Count);
+            Assert.AreEqual(1, collector.currentRun.frames[0].sensors.Count());
+            var rgb = collector.currentRun.frames[0].sensors.First() as RgbSensor;
+            Assert.NotNull(rgb);
+            Assert.AreEqual(1, rgb.annotations.Count());
+            var ann = rgb.annotations.First() as SemanticSegmentationLabeler.SemanticSegmentation;
+            Assert.NotNull(ann);
+            Assert.NotZero(ann.buffer.Length);
         }
 
         static IdLabelConfig CreateLabelingConfiguration()

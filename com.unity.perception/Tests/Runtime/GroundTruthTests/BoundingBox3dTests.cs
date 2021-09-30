@@ -35,6 +35,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator CameraOffset_ProduceProperTranslationTest()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var expected = new[]
             {
                 new ExpectedResult
@@ -56,6 +58,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator CameraOffsetAndRotated_ProduceProperTranslationTest()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var expected = new[]
             {
                 new ExpectedResult
@@ -77,6 +81,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SimpleMultiMesh_ProduceProperTranslationTest()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var expected = new[]
             {
                 new ExpectedResult
@@ -252,6 +258,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ParentedObject_ProduceProperResults([ValueSource(nameof(ParentedObject_ProduceProperResults_Values))] ParentedTestData parentedTestData)
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var expected = new[]
             {
                 new ExpectedResult
@@ -316,6 +324,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator MultiInheritedMesh_ProduceProperTranslationTest()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var expected = new[]
             {
                 new ExpectedResult
@@ -339,6 +349,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator MultiInheritedMeshDifferentLabels_ProduceProperTranslationTest()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var wheelScale = new Vector3(0.7f, 2.0f, 0.7f);
             var wheelRot = Quaternion.Euler(0, 0, 90);
 
@@ -382,6 +394,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator TestOcclusion_Seen()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var target = TestHelper.CreateLabeledCube(scale: 15f, z: 50f);
             return ExecuteSeenUnseenTest(target, Vector3.zero, quaternion.identity, 1);
         }
@@ -389,6 +403,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator TestOcclusion_Unseen()
         {
+            DatasetCapture.Instance.automaticShutdown = false;
+
             var target = TestHelper.CreateLabeledCube(scale: 15f, z: -50f);
             return ExecuteSeenUnseenTest(target, Vector3.zero, quaternion.identity, 0);
         }
