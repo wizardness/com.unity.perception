@@ -326,6 +326,19 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                         $"Invalid state {state} encountered while updating scenario");
             }
         }
+
+        public void DoIteration()
+        {
+            activeScenario = this;
+            OnStart();
+            foreach (var randomizer in activeRandomizers)
+                randomizer.ScenarioStart();
+
+            foreach (var randomizer in activeRandomizers)
+            {
+                randomizer.IterationStart();
+            }
+        }
         #endregion
 
         void IterationLoop()

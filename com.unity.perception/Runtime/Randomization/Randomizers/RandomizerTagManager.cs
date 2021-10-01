@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEditor;
 
 namespace UnityEngine.Perception.Randomization.Randomizers
 {
@@ -24,6 +25,13 @@ namespace UnityEngine.Perception.Randomization.Randomizers
         /// <returns>RandomizerTags of the given type</returns>
         public IEnumerable<T> Query<T>(bool returnSubclasses = false) where T : RandomizerTag
         {
+            #if UNITY_EDITOR
+            if (!EditorApplication.isPlaying)
+            {
+                foreach (var o in Object.FindObjectsOfType<T>())
+                    yield return o;
+            }
+            #endif
             var queriedTagType = typeof(T);
             if (!m_TagMap.ContainsKey(queriedTagType))
                 yield break;
