@@ -28,12 +28,13 @@
             #include "UnityCG.cginc"
             #include "Packing.hlsl"
 
-            sampler2D _MainTex;
+            Texture2D _MainTex;
             fixed4 _BaseColor;
             float4 _MainTex_ST;
             //float _TransparencyThreshold;
             float _TextureIsSegmentationMask;
             //float _EnableTransparency;
+            SamplerState s_point_clamp_sampler;
 
             struct appdata
             {
@@ -59,16 +60,16 @@
 
             fixed4 frag (v2f i) : SV_Target
             {
-                fixed4 col = tex2D(_MainTex, i.uv);
+                fixed4 col = _MainTex.Sample(s_point_clamp_sampler, i.uv);
                 fixed4 outColor = _SegmentationId;
 
                 if (_TextureIsSegmentationMask == 1)
                 {
-                    if (col.r == 0 && col.g == 0 && col.b == 0)
-                    {
-                        outColor = fixed4(0,0,0,1);
-                    }
-                    return outColor;
+                    // if (col.r == 0 && col.g == 0 && col.b == 0)
+                    // {
+                    //     outColor = fixed4(0,0,0,1);
+                    // }
+                    return col;
                 }
 
                 // float opacity = 1 * _BaseColor.a;

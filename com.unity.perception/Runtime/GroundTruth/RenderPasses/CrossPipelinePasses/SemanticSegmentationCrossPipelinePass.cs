@@ -23,11 +23,13 @@ namespace UnityEngine.Perception.GroundTruth
         // [SerializeField]
         Shader m_ClassLabelingShader;
         Material m_OverrideMaterial;
+        LayerMask m_LayerMask;
 
-        public SemanticSegmentationCrossPipelinePass(
-            Camera targetCamera, SemanticSegmentationLabelConfig labelConfig) : base(targetCamera)
+        public SemanticSegmentationCrossPipelinePass(Camera targetCamera, SemanticSegmentationLabelConfig labelConfig,
+            LayerMask layerMask) : base(targetCamera)
         {
             m_LabelConfig = labelConfig;
+            m_LayerMask = layerMask;
         }
 
         public override void Setup()
@@ -54,7 +56,7 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
 
             s_LastFrameExecuted = Time.frameCount;
-            var renderList = CreateRendererListDesc(camera, cullingResult, "FirstPass", 0, m_OverrideMaterial, -1);
+            var renderList = CreateRendererListDesc(camera, cullingResult, "FirstPass", 0, m_OverrideMaterial, m_LayerMask);
             cmd.ClearRenderTarget(true, true, m_LabelConfig.skyColor);
             DrawRendererList(renderContext, cmd, RendererList.Create(renderList));
         }

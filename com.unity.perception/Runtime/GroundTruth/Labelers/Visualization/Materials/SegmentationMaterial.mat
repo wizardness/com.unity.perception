@@ -86,7 +86,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _AlphaClip: 1
-    - _BackTransparency: 0
+    - _BackTransparency: 0.78313255
     - _Blend: 2
     - _BlendOp: 0
     - _BumpScale: 1
@@ -153,6 +153,7 @@ Material:
     - _ReplaceColor: {r: 1, g: 1, b: 1, a: 0}
     - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+  m_BuildTextureStacks: []
 --- !u!114 &3089368426582508830
 MonoBehaviour:
   m_ObjectHideFlags: 11

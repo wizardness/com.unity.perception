@@ -81,9 +81,9 @@
                 if (_TextureIsSegmentationMask == 1)
                 {
                     if (col.r == 0 && col.g == 0 && col.b == 0)
-                        outColor = fixed4(0,0,0,1);
+                        col = fixed4(0,0,0,1);
 
-                    return outColor;
+                    return col;
                 }
 
                 // //float opacity = col.a * _BaseColor.a;

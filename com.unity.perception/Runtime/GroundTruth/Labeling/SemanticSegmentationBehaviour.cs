@@ -7,6 +7,6 @@ public class SemanticSegmentationBehaviour : MonoBehaviour
     //public bool enableTransparency = false;
     //public float opacityThreshold = 1;
     public bool useSegmentationMask;
-    public Texture2D segmentationMask;
+    public Texture segmentationMask;
     public bool useMainTextureAsSegmask = false;
 }

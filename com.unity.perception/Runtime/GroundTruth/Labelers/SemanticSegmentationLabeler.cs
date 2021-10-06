@@ -48,6 +48,8 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public SemanticSegmentationLabelConfig labelConfig;
 
+        public LayerMask layerMask = ~0;
+
         /// <summary>
         /// Event information for <see cref="SemanticSegmentationLabeler.imageReadback"/>
         /// </summary>
@@ -171,10 +173,13 @@ namespace UnityEngine.Perception.GroundTruth
 
 #if HDRP_PRESENT
             var gameObject = perceptionCamera.gameObject;
-            var customPassVolume = gameObject.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
+            var gameObjectForVolume = new GameObject();
+            gameObjectForVolume.transform.parent = gameObject.transform;
+            gameObjectForVolume.name = "Semantic Segmentation Volume";
+            var customPassVolume = gameObjectForVolume.AddComponent<CustomPassVolume>();
             customPassVolume.injectionPoint = CustomPassInjectionPoint.BeforeRendering;
             customPassVolume.isGlobal = true;
-            m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, targetTexture, labelConfig)
+            m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, targetTexture, labelConfig, layerMask)
             {
                 name = "Labeling Pass"
             };
