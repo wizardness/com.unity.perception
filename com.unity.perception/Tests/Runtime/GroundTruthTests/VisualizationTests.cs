@@ -50,8 +50,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator VisualizedCamera_SetsUpCanvas()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var object1 = SetupCameraSemanticSegmentation(nameof(VisualizedCamera_SetsUpCanvas));
             object1.SetActive(true);
             AddTestObjectForCleanup(object1);
@@ -64,8 +62,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator TwoCamerasVisualizing_CausesWarningAndDisablesVisualization()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var object1 = new GameObject();
             object1.name = nameof(TwoCamerasVisualizing_CausesWarningAndDisablesVisualization);
             object1.SetActive(false);
@@ -92,8 +88,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator DestroyCamera_RemovesVisualization()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var object1 = SetupCameraSemanticSegmentation(nameof(DestroyCamera_RemovesVisualization));
             object1.SetActive(true);
             AddTestObjectForCleanup(object1);
@@ -108,8 +102,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator DestroyAndRecreateCamera_ProperlyVisualizes()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var object1 = SetupCameraSemanticSegmentation(nameof(DestroyAndRecreateCamera_ProperlyVisualizes));
             object1.SetActive(true);
             AddTestObjectForCleanup(object1);
@@ -130,8 +122,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator TwoLabelersOfSameType_ProperlyStoredInHud()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-            
             var label = "label";
             var planeObject = TestHelper.CreateLabeledPlane(.1f, label);
             AddTestObjectForCleanup(planeObject);

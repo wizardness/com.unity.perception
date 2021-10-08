@@ -441,7 +441,7 @@ namespace UnityEngine.Perception.GroundTruth
         {
             var capture = new RgbSensor
             {
-                Id = "perception_camera",
+                Id = ID,
                 sensorType = "rgb_camera",
                 description = "you know",
                 position = transform.position,
@@ -450,6 +450,8 @@ namespace UnityEngine.Perception.GroundTruth
                 acceleration = Vector3.zero,
                 imageFormat = RgbSensor.ImageFormat.PNG,
                 dimension = new Vector2(cam.pixelWidth, cam.pixelHeight),
+                intrinsics = ToProjectionMatrix3x3(cam.projectionMatrix),
+                projection = cam.orthographic ? "orthographic" : "perspective",
                 buffer = new byte[0]
             };
 
@@ -461,19 +463,6 @@ namespace UnityEngine.Perception.GroundTruth
 
 
             Profiler.BeginSample("CaptureDataFromLastFrame");
-
-
-
-
-            //var width = cam.pixelWidth;
-            //var height = cam.pixelHeight;
-
-            var frameCount = Time.frameCount;
-            //var captureFilename = $"{Manager.Instance.GetDirectoryFor(rgbDirectory)}/{k_RgbFilePrefix}{frameCount}.png";
-
-            // Record the camera's projection matrix
-            SetPersistentSensorData("camera_intrinsic", ToProjectionMatrix3x3(cam.projectionMatrix));
-            SetPersistentSensorData("projection", cam.orthographic ? "orthographic" : "perspective");
 
             var asyncSensor = SensorHandle.ReportSensorAsync();
 

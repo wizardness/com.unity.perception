@@ -24,8 +24,6 @@ namespace GroundTruthTests
 
         internal SimulationStateTestHelper()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             m_State = DatasetCapture.Instance.currentSimulation;
             var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
             m_SequenceTimeOfNextCaptureMethod = m_State.GetType().GetMethod("GetSequenceTimeOfNextCapture", bindingFlags);
@@ -80,8 +78,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SequenceTimeOfNextCapture_ReportsCorrectTime()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
 
@@ -115,8 +111,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SequenceTimeOfNextCapture_WithInBetweenFrames_ReportsCorrectTime()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
             var framesBetweenCaptures = 2;
@@ -166,8 +160,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator FramesScheduledBySensorConfig()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var firstCaptureFrame = 2;
             var simulationDeltaTime = .4f;
 
@@ -192,8 +184,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator FramesScheduled_WithTimeScale_ResultsInProperDeltaTime()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var firstCaptureFrame = 2;
             var simulationDeltaTime = 1f;
             var timeScale = 2;
@@ -220,9 +210,7 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ChangingTimeScale_CausesDebugError()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
-           DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 2, CaptureTriggerMode.Scheduled, 1, 0));
+            DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 2, CaptureTriggerMode.Scheduled, 1, 0));
 
             yield return null;
             Time.timeScale = 5;
@@ -233,8 +221,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ChangingTimeScale_DuringStartNewSequence_Succeeds()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 2, CaptureTriggerMode.Scheduled, 1, 0));
 
             yield return null;
@@ -247,8 +233,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator FramesScheduled_WithChangingTimeScale_ResultsInProperDeltaTime()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var firstCaptureFrame = 2;
             var simulationDeltaTime = 1f;
             float[] newTimeScalesPerFrame =
@@ -280,7 +264,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ResetSimulation_ResetsCaptureDeltaTime()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
             DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Scheduled, 5, 0));
             yield return null;
             Assert.AreEqual(5, Time.captureDeltaTime);
@@ -291,7 +274,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ShouldCaptureFlagsAndRenderTimesAreCorrectWithMultipleSensors()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
             var firstCaptureFrame1 = 2;
             var simDeltaTime1 = 4;
             var framesBetweenCaptures1 = 2;
@@ -338,8 +320,6 @@ namespace GroundTruthTests
         [TestCase(235, 10, 2350, 2585, 2820, 3055, ExpectedResult = (IEnumerator)null)]
         public IEnumerator SequenceTimeOfNextCapture_ReportsCorrectTime_VariedDeltaTimesAndStartFrames(float simulationDeltaTime, int firstCaptureFrame, float firstCaptureTime, float secondCaptureTime, float thirdCaptureTime, float fourthCaptureTime)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", firstCaptureFrame, CaptureTriggerMode.Scheduled, simulationDeltaTime, 0));
 
             float[] sequenceTimesExpected =
@@ -372,8 +352,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorDoesNotAffectTimings()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, 0, 0, false));
 
             var framesToCaptureOn = new List<int>();
@@ -423,8 +401,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SequenceTimeOfManualCapture_ReportsCorrectTime_ManualSensorAffectsTimings()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var simulationDeltaTime = 0.05f;
             var sensorHandle = DatasetCapture.Instance.RegisterSensor(CreateSensorDefinition("cam", "", "", 0, CaptureTriggerMode.Manual, simulationDeltaTime, 0, true));
 

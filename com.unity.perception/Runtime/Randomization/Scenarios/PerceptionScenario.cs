@@ -22,7 +22,7 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// <summary>
         /// The metric definition used to report the current scenario iteration
         /// </summary>
-//        MetricDefinition m_IterationMetricDefinition;
+        MetricDefinition m_IterationMetricDefinition;
 
         /// <summary>
         /// The scriptable render pipeline hook used to capture perception data skips the first frame of the simulation
@@ -43,26 +43,10 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                 return true;
             }
         }
-#if false
-        class ShutdownCondition : ICondition
-        {
-            public bool HasConditionBeenMet()
-            {
-                if (DatasetCapture.Instance.ReadyToShutdown)
-                {
-                    Debug.Log("Triggered dc ready");
-                }
 
-                return DatasetCapture.Instance.ReadyToShutdown;
-            }
-        }
-#endif
         /// <inheritdoc/>
         protected override void OnStart()
         {
-            var md = new MetricDefinition();
-            DatasetCapture.Instance.RegisterMetric(md);
-
 //            Manager.Instance.ShutdownCondition = new ShutdownCondition();
 
             Manager.Instance.ShutdownNotification += () =>
@@ -71,16 +55,14 @@ namespace UnityEngine.Perception.Randomization.Scenarios
                 Quit();
             };
 
-#if false
-            m_IterationMetricDefinition = DatasetCapture.RegisterMetricDefinition(
-                "scenario_iteration", "Iteration information for dataset sequences",
-                Guid.Parse(k_ScenarioIterationMetricDefinitionId));
+#if true
+            m_IterationMetricDefinition = new MetricDefinition("scenario_iteration", "Iteration information for dataset sequences");
+            DatasetCapture.Instance.RegisterMetric(m_IterationMetricDefinition);
 
-            var randomSeedMetricDefinition = DatasetCapture.RegisterMetricDefinition(
-                "random-seed",
-                "The random seed used to initialize the random state of the simulation. Only triggered once per simulation.",
-                Guid.Parse("14adb394-46c0-47e8-a3f0-99e754483b76"));
-            DatasetCapture.ReportMetric(randomSeedMetricDefinition, new[] { genericConstants.randomSeed });
+            var randomSeedMetricDefinition = new MetricDefinition("random-seed", "The random seed used to initialize the random state of the simulation. Only triggered once per simulation.");
+            DatasetCapture.Instance.RegisterMetric(randomSeedMetricDefinition);
+
+            DatasetCapture.Instance.ReportMetric(randomSeedMetricDefinition, new object[] { genericConstants.randomSeed });
 #endif
         }
 
@@ -88,12 +70,18 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         protected override void OnIterationStart()
         {
             DatasetCapture.Instance.StartNewSequence();
-#if false
-            DatasetCapture.ReportMetric(m_IterationMetricDefinition, new[]
+#if true
+            DatasetCapture.Instance.ReportMetric(m_IterationMetricDefinition, new object[]
             {
                 new IterationMetricData { iteration = currentIteration }
             });
 #endif
+        }
+
+        static IEnumerator WaitUntilWritesAreComplete()
+        {
+            var dcWatcher = new DatasetCapture.WaitUntilComplete();
+            yield return dcWatcher;
         }
 
         /// <inheritdoc/>
@@ -106,14 +94,15 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         protected override void OnComplete()
         {
             DatasetCapture.Instance.ResetSimulation();
+            StartCoroutine(WaitUntilWritesAreComplete());
 
             //Manager.Instance.ShutdownAfterFrames(105);
             //Manager.Instance.Shutdown();
             //DatasetCapture.Instance.ResetSimulation();
 #endif
-//            Quit();
+            Quit();
         }
-#if false
+#if true
         /// <summary>
         /// Used to report a scenario iteration as a perception metric
         /// </summary>

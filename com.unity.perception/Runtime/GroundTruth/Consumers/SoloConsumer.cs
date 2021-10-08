@@ -58,7 +58,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return path;
         }
 
-        void WriteJTokenToFile(string filePath, JToken jToken)
+        static void WriteJTokenToFile(string filePath, JToken jToken)
         {
             var stringWriter = new StringWriter(new StringBuilder(256), CultureInfo.InvariantCulture);
             using (var jsonTextWriter = new JsonTextWriter(stringWriter))
@@ -84,6 +84,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         {
             var path = Path.Combine(currentDirectory, "metadata.json");
             WriteJTokenToFile(path, ToMetadata(metadata));
+
             m_IsComplete = true;
         }
 
@@ -126,7 +127,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             };
 
             var captures = new JArray();
-
+            var metrics = new JArray();
 
             foreach (var sensor in frame.sensors)
             {
@@ -138,10 +139,22 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 }
             }
 
-
-
             frameJson["captures"] = captures;
 
+            foreach (var metric in frame.metrics)
+            {
+                switch (metric)
+                {
+                    case ObjectCountLabeler.ObjectCountMetric objCount:
+                        metrics.Add(ConvertMetric(frame, objCount));
+                        break;
+                    case RenderedObjectInfoLabeler.RenderedObjectInfoMetric info:
+                        metrics.Add(ConvertMetric(frame, info));
+                        break;
+                }
+            }
+
+            frameJson["metrics"] = metrics;
 
             return frameJson;
         }
@@ -184,7 +197,6 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return token;
         }
 
-
         static JToken ConvertSensor(Frame frame, RgbSensor sensor)
         {
             // write out the png data
@@ -195,6 +207,10 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             var file = File.Create(path, 4096);
             file.Write(sensor.buffer, 0, sensor.buffer.Length);
             file.Close();
+#else
+            var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
+            allTasks.Add(fs.WriteAsync(sensor.buffer, 0, sensor.buffer.Length));
+
 #endif
             var outRgb = ToSensorHeader(frame, sensor);
             outRgb["fileName"] = path;
@@ -202,7 +218,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             outRgb["dimension"] = FromVector2(sensor.dimension);
 
             var annotations = new JArray();
-            var metrics = new JArray();
+
 
             foreach (var annotation in sensor.annotations)
             {
@@ -226,18 +242,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 }
             }
 
-            foreach (var metric in sensor.metrics)
-            {
-                switch (metric)
-                {
-                    case ObjectCountLabeler.ObjectCountMetric objCount:
-                        metrics.Add(ConvertMetric(frame, objCount));
-                        break;
-                }
-            }
-
             outRgb["annotations"] = annotations;
-            outRgb["metrics"] = metrics;
 
             return outRgb;
         }
@@ -360,6 +365,26 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             }
 
             outCount["object_counts"] = values;
+            return outCount;
+        }
+
+        static JToken ConvertMetric(Frame frame, RenderedObjectInfoLabeler.RenderedObjectInfoMetric info)
+        {
+            var outCount = ToMetricHeader(frame, info);
+            var values = new JArray();
+
+            foreach (var i in info.objectInfo)
+            {
+                values.Add(new JObject
+                {
+                    ["label_id"] = i.label_id,
+                    ["instance_id"] = i.instance_id,
+                    ["instance_color"] = FromColor32(i.instance_color),
+                    ["visible_pixels"] = i.visible_pixels
+                });
+            }
+
+            outCount["object_info"] = values;
             return outCount;
         }
 

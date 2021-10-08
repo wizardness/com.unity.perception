@@ -63,8 +63,6 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
-
             DatasetCapture.Instance.ResetSimulation();
 
             var dcWatcher = new DatasetCapture.WaitUntilComplete();
@@ -86,7 +84,6 @@ namespace GroundTruthTests
 
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>
@@ -125,7 +122,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>

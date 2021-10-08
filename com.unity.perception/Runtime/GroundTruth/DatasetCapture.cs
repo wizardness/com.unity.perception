@@ -5,7 +5,6 @@ using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.Consumers;
 using UnityEngine.Perception.GroundTruth.DataModel;
-using UnityEngine.Rendering;
 
 #pragma warning disable 649
 namespace UnityEngine.Perception.GroundTruth
@@ -23,14 +22,8 @@ namespace UnityEngine.Perception.GroundTruth
 
         public static DatasetCapture Instance => s_Instance ?? (s_Instance = new DatasetCapture());
 
-        //SimulationState m_SimulationState = null;
-        //List<SimulationState> m_ShuttingDownSimulationStates = new List<SimulationState>();
-
-        Type m_ActiveConsumerType = typeof(SoloConsumer);
-
-        public bool CanBeShutdown()
+        bool CanBeShutdown()
         {
-            Debug.Log($"DC::CanBeShutdown, ready: {m_ReadyToShutdown}, active: {m_ActiveSimulation.IsNotRunning()}, shutting down #: {m_ShuttingDownSimulations.Count}, shutting down ready: {m_ShuttingDownSimulations.All(s => s.IsNotRunning())}");
             return m_ReadyToShutdown && m_ActiveSimulation.IsNotRunning() && m_ShuttingDownSimulations.All(s => s.IsNotRunning());
         }
 
@@ -39,63 +32,13 @@ namespace UnityEngine.Perception.GroundTruth
             public override bool keepWaiting => !Instance.CanBeShutdown();
         }
 
-        class AllCapturesCompleteShutdownCondition : ICondition
-        {
-            public bool HasConditionBeenMet()
-            {
-                if (Instance.m_ReadyToShutdown)
-                    Debug.Log("In here, but I doubt it");
-
-                return Instance.CanBeShutdown();
-            }
-        }
-
-        bool m_automaticShutdown = true;
-
-        public bool automaticShutdown
-        {
-            get => m_automaticShutdown;
-            set
-            {
-                switch (value)
-                {
-                    case true when !m_automaticShutdown:
-                        Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
-                        break;
-                    case false when m_automaticShutdown:
-                        Manager.Instance.ShutdownCondition = null;
-                        break;
-                }
-
-                m_automaticShutdown = value;
-            }
-
-        }
-
         DatasetCapture()
         {
-            Debug.Log("Dataset Capture NEW!!!");
-
-            if (automaticShutdown)
-                Manager.Instance.ShutdownCondition = new AllCapturesCompleteShutdownCondition();
             Manager.Instance.ShutdownNotification += OnApplicationShutdown;
         }
 
-        internal SimulationState currentSimulation
-        {
-            get => m_ActiveSimulation ?? (m_ActiveSimulation = CreateSimulationData());
-        }
-#if false
-        internal SimulationState simulationState
-        {
-            get
-            {
-                if (!m_Simulations.Any()) m_Simulations.Add(CreateSimulationData());
-                return m_Simulations.Last();
-            }
-            private set => m_Simulations.Add(value);
-        }
-#endif
+        internal SimulationState currentSimulation => m_ActiveSimulation ?? (m_ActiveSimulation = CreateSimulationData());
+
         /// <summary>
         /// The json metadata schema version the DatasetCapture's output conforms to.
         /// </summary>
@@ -123,6 +66,16 @@ namespace UnityEngine.Perception.GroundTruth
             currentSimulation.RegisterAnnotationDefinition(definition);
         }
 
+        public (int sequence, int step) GetSequenceAndStepFromFrame(int frame)
+        {
+            return currentSimulation.GetSequenceAndStepFromFrame(frame);
+        }
+
+        public void ReportMetric(MetricDefinition definition, object[] values)
+        {
+            currentSimulation.ReportMetric(definition, values);
+        }
+
         /// <summary>
         /// Starts a new sequence in the capture.
         /// </summary>
@@ -131,7 +84,8 @@ namespace UnityEngine.Perception.GroundTruth
         internal bool IsValid(string id) => currentSimulation.Contains(id);
 
         static ConsumerEndpoint s_Endpoint;
-        static Type s_EndpointType = typeof(SoloConsumer);
+        //static Type s_EndpointType = typeof(SoloConsumer);
+        static Type s_EndpointType = typeof(OldPerceptionConsumer);
 
         public static void SetEndpoint(ConsumerEndpoint endpoint)
         {
@@ -207,13 +161,162 @@ namespace UnityEngine.Perception.GroundTruth
     public enum FutureType
     {
         Sensor,
-        Annotation,
-        Metric
+        Metric,
+        Annotation
     }
 
-    public interface IAsyncFuture<T> where T : SimulationState.IPendingId
+    public class PendingId
     {
-        T GetId();
+        public static PendingId CreateSensorId(int sequence, int step, string sensorId)
+        {
+            return new PendingId(FutureType.Sensor, sequence, step, sensorId, string.Empty,string.Empty);
+        }
+
+        public static PendingId CreateMetricId(int sequence, int step, string metricId)
+        {
+            return new PendingId(FutureType.Metric, sequence, step, string.Empty, string.Empty, metricId);
+        }
+
+        public static PendingId CreateMetricId(int sequence, int step, string sensorId, string metricId)
+        {
+            return new PendingId(FutureType.Metric, sequence, step, sensorId, string.Empty, metricId);
+        }
+
+        public static PendingId CreateMetricId(int sequence, int step, string sensorId, string annotationId, string metricId)
+        {
+            return new PendingId(FutureType.Metric, sequence, step, sensorId, annotationId, metricId);
+        }
+
+        public static PendingId CreateAnnotationId(int sequence, int step, string sensorId, string annotationId)
+        {
+            return new PendingId(FutureType.Annotation, sequence, step, sensorId, annotationId, string.Empty);
+        }
+
+
+
+        private PendingId(FutureType futureType, int sequence, int step, string sensorId, string annotationId, string metricId)
+        {
+            FutureType = futureType;
+            Sequence = sequence;
+            Step = step;
+            SensorId = sensorId;
+            AnnotationId = annotationId;
+            MetricId = metricId;
+        }
+
+        public FutureType FutureType { get; }
+
+        public int Sequence { get; }
+
+        public int Step { get; }
+
+        public string SensorId { get; }
+        public string AnnotationId { get; }
+        public string MetricId { get; }
+
+        bool isBaseValid => Sequence > -1 && Step > -1;
+
+
+        public bool IsValidSensorId =>
+            // Do not check if it's a sensor ID because both annotation and (some) metric IDs can be used to
+            // load sensors
+            isBaseValid && !string.IsNullOrEmpty(SensorId);
+
+        public bool IsValidMetricId =>
+            isBaseValid &&
+            FutureType == FutureType.Metric &&
+            !string.IsNullOrEmpty(MetricId);
+
+        public bool IsValidAnnotationId =>
+            isBaseValid &&
+            FutureType == FutureType.Annotation &&
+            !string.IsNullOrEmpty(SensorId) &&
+            !string.IsNullOrEmpty(AnnotationId);
+
+        public override bool Equals(object obj)
+        {
+            if (obj is PendingId other)
+            {
+                if (other.FutureType != FutureType) return false;
+                if (other.Sequence != Sequence) return false;
+                if (other.Step != Step) return false;
+
+                switch (FutureType)
+                {
+                   case FutureType.Metric:
+                        if (other.MetricId != MetricId) return false;
+                        if (other.AnnotationId != AnnotationId) return false;
+                        return other.SensorId == SensorId;
+                   case FutureType.Annotation:
+                        if (other.AnnotationId != AnnotationId) return false;
+                        return other.SensorId == SensorId;
+                   case FutureType.Sensor:
+                        return other.SensorId == SensorId;
+                    default:
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            var hc = (Sequence * 397) ^ Step;
+            hc = (SensorId != null ? SensorId.GetHashCode() : 0 * 397) ^ hc;
+            hc = (AnnotationId != null ? AnnotationId.GetHashCode() : 0 * 397) ^ hc;
+            return (MetricId != null ? MetricId.GetHashCode() : 0 * 397) ^ hc;
+
+        }
+    }
+
+    public struct AsyncFuture<T> where T : DataModelBase
+    {
+        public static AsyncFuture<Sensor> CreateSensorFuture(PendingId id, SimulationState simState)
+        {
+            return new AsyncFuture<Sensor>(id, simState);
+        }
+
+        public static AsyncFuture<Metric> CreateMetricFuture(PendingId id, SimulationState simState)
+        {
+            return new AsyncFuture<Metric>(id, simState);
+        }
+
+        public static AsyncFuture<Annotation> CreateAnnotationFuture(PendingId id, SimulationState simState)
+        {
+            return new AsyncFuture<Annotation>(id, simState);
+        }
+
+        AsyncFuture(PendingId id, SimulationState simulationState)
+        {
+            pendingId = id;
+            this.simulationState = simulationState;
+        }
+
+        public SimulationState simulationState { get; private set; }
+        public PendingId pendingId { get; private set; }
+
+        public FutureType FutureType => pendingId.FutureType;
+
+        public bool IsValid()
+        {
+            return simulationState != null && simulationState.IsRunning();
+        }
+
+        public bool IsPending()
+        {
+            return simulationState.IsPending(this);
+        }
+
+        public void Report(T toReport)
+        {
+            simulationState.ReportAsyncResult(this, toReport);
+        }
+    }
+#if false
+    public interface IAsyncFuture
+    {
+        PendingId GetId();
 
         FutureType GetFutureType();
 
@@ -222,18 +325,20 @@ namespace UnityEngine.Perception.GroundTruth
         bool IsPending();
     }
 
-    public struct AsyncSensorFuture : IAsyncFuture<SimulationState.PendingSensorId>
+    public struct AsyncSensorFuture : IAsyncFuture
     {
-        public AsyncSensorFuture(SimulationState.PendingSensorId id, SimulationState simulationState)
+        public AsyncSensorFuture(PendingId id, SimulationState simulationState)
         {
+            if (!id.IsValidSensorId) throw new ArgumentException("Passed in wrong ID type");
+
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.PendingSensorId m_Id;
+        PendingId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.PendingSensorId GetId()
+        public PendingId GetId()
         {
             return m_Id;
         }
@@ -259,18 +364,20 @@ namespace UnityEngine.Perception.GroundTruth
         }
     }
 
-    public struct AsyncAnnotationFuture : IAsyncFuture<SimulationState.PendingCaptureId>
+    public struct AsyncAnnotationFuture : IAsyncFuture
     {
-        public AsyncAnnotationFuture(SimulationState.PendingCaptureId id, SimulationState simulationState)
+        // TODO I do not like throwing exceptions in constructors, rethink this...
+        public AsyncAnnotationFuture(PendingId id, SimulationState simulationState)
         {
+            if (!id.IsValidAnnotationId) throw new ArgumentException("Wrong ID type");
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.PendingCaptureId m_Id;
+        PendingId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.PendingCaptureId GetId()
+        public PendingId GetId()
         {
             return m_Id;
         }
@@ -296,18 +403,20 @@ namespace UnityEngine.Perception.GroundTruth
         }
     }
 
-    public struct AsyncMetricFuture : IAsyncFuture<SimulationState.PendingCaptureId>
+    public struct AsyncMetricFuture : IAsyncFuture
     {
-        public AsyncMetricFuture(SimulationState.PendingCaptureId id, SimulationState simulationState)
+        // TODO I do not like throwing exceptions in constructors, rethink this...
+        public AsyncMetricFuture(PendingId id, SimulationState simulationState)
         {
+            if (!id.IsValidMetricId) throw new ArgumentException("Wrong ID type");
             m_Id = id;
             m_SimulationState = simulationState;
         }
 
-        SimulationState.PendingCaptureId m_Id;
+        PendingId m_Id;
         SimulationState m_SimulationState;
 
-        public SimulationState.PendingCaptureId GetId()
+        public PendingId GetId()
         {
             return m_Id;
         }
@@ -332,7 +441,7 @@ namespace UnityEngine.Perception.GroundTruth
             m_SimulationState.ReportAsyncResult(this, metric);
         }
     }
-
+#endif
     /// <summary>
     /// A handle to a sensor managed by the <see cref="DatasetCapture"/>. It can be used to check whether the sensor
     /// is expected to capture this frame and report captures, annotations, and metrics regarding the sensor.
@@ -381,7 +490,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <returns>Returns a handle to the <see cref="AsyncAnnotation"/>, which can be used to report annotation data during a subsequent frame.</returns>
         /// <exception cref="InvalidOperationException">Thrown if this method is called during a frame where <see cref="ShouldCaptureThisFrame"/> is false.</exception>
         /// <exception cref="ArgumentException">Thrown if the given AnnotationDefinition is invalid.</exception>
-        public AsyncAnnotationFuture ReportAnnotationAsync(AnnotationDefinition annotationDefinition)
+        public AsyncFuture<Annotation> ReportAnnotationAsync(AnnotationDefinition annotationDefinition)
         {
             if (!ShouldCaptureThisFrame)
                 throw new InvalidOperationException("Annotation reported on SensorHandle in frame when its ShouldCaptureThisFrame is false.");
@@ -391,7 +500,7 @@ namespace UnityEngine.Perception.GroundTruth
             return DatasetCapture.Instance.currentSimulation.ReportAnnotationAsync(annotationDefinition, this);
         }
 
-        public AsyncSensorFuture ReportSensorAsync()
+        public AsyncFuture<Sensor> ReportSensorAsync()
         {
             if (!ShouldCaptureThisFrame)
                 throw new InvalidOperationException("Annotation reported on SensorHandle in frame when its ShouldCaptureThisFrame is false.");
@@ -435,7 +544,6 @@ namespace UnityEngine.Perception.GroundTruth
             DatasetCapture.Instance.currentSimulation.ReportMetric(this, definition, metric);
         }
 
-
 #if false
         public MetricHandle ReportMetric(MetricDefinition definition, Metric metric)
         {
@@ -454,7 +562,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <param name="metricDefinition">The <see cref="MetricDefinition"/> of the metric</param>
         /// <exception cref="InvalidOperationException">Thrown if <see cref="ShouldCaptureThisFrame"/> is false</exception>
         /// <returns>An <see cref="AsyncMetric"/> which should be used to report the metric values, potentially in a later frame</returns>
-        public AsyncMetricFuture ReportMetricAsync(MetricDefinition metricDefinition)
+        public AsyncFuture<Metric> ReportMetricAsync(MetricDefinition metricDefinition)
         {
             if (!ShouldCaptureThisFrame)
                 throw new InvalidOperationException($"Sensor-based metrics may only be reported when SensorHandle.ShouldCaptureThisFrame is true");
@@ -547,7 +655,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// The ID of the annotation which will be used in the json metadata.
         /// </summary>
-        public string Id => m_Definition.id;
+        public string Id => m_Definition != null ? m_Definition.id : string.Empty;
 
         /// <summary>
         /// The SensorHandle on which the annotation was reported

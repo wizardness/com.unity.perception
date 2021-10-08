@@ -23,33 +23,13 @@ namespace UnityEngine.Perception.GroundTruth
             static readonly string k_Description = "Produces 3D bounding box ground truth data for all visible objects that bear a label defined in this labeler's associated label configuration.";
             static readonly string k_AnnotationType = "bounding box 3d";
 
-            public BoundingBox3DAnnotationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
-
-            public BoundingBox3DAnnotationDefinition(IEnumerable<DefinitionEntry> spec)
+            public BoundingBox3DAnnotationDefinition(IdLabelConfig.LabelEntrySpec[] spec)
                 : base(k_Id, k_Description, k_AnnotationType)
             {
                 this.spec = spec;
             }
 
-            [Serializable]
-            public struct DefinitionEntry : IMessageProducer
-            {
-                public DefinitionEntry(int id, string name)
-                {
-                    labelId = id;
-                    labelName = name;
-                }
-
-                public int labelId;
-                public string labelName;
-                public void ToMessage(IMessageBuilder builder)
-                {
-                    builder.AddInt("label_id", labelId);
-                    builder.AddString("label_name", labelName);
-                }
-            }
-
-            public IEnumerable<DefinitionEntry> spec;
+            public IdLabelConfig.LabelEntrySpec[] spec;
 
             public override void ToMessage(IMessageBuilder builder)
             {
@@ -57,7 +37,8 @@ namespace UnityEngine.Perception.GroundTruth
                 foreach (var e in spec)
                 {
                     var nested = builder.AddNestedMessageToVector("spec");
-                    e.ToMessage(nested);
+                    // TODO figure out how to generically write the spec to a message builder
+                    //e.ToMessage(nested);
                 }
             }
         }
@@ -195,7 +176,7 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxes3DReceived");
         BoundingBox3DAnnotationDefinition m_AnnotationDefinition;
 
-        Dictionary<int, AsyncAnnotationFuture> m_AsyncAnnotations;
+        Dictionary<int, AsyncFuture<Annotation>> m_AsyncAnnotations;
         Dictionary<int, Dictionary<uint, BoundingBoxAnnotation.Entry>> m_BoundingBoxValues;
         List<BoundingBoxAnnotation.Entry> m_ToReport;
 
@@ -236,14 +217,13 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("BoundingBox3DLabeler's idLabelConfig field must be assigned");
 
-            var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBox3DAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
-            m_AnnotationDefinition = new BoundingBox3DAnnotationDefinition(spec);
+            m_AnnotationDefinition = new BoundingBox3DAnnotationDefinition(idLabelConfig.GetAnnotationSpecification());
 
             DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderObjectInfosCalculated;
 
-            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotationFuture>();
+            m_AsyncAnnotations = new Dictionary<int, AsyncFuture<Annotation>>();
             m_BoundingBoxValues = new Dictionary<int, Dictionary<uint, BoundingBoxAnnotation.Entry>>();
             m_ToReport = new List<BoundingBoxAnnotation.Entry>();
         }

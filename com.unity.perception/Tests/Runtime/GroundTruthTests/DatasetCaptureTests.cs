@@ -95,7 +95,6 @@ namespace GroundTruthTests
 
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
             var sensorHandle = RegisterSensor(id, modality, def, firstFrame, mode, delta, framesBetween);
             Assert.IsTrue(sensorHandle.IsValid);
 
@@ -146,7 +145,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
             SimulationState.TimeOutFrameCount = 5;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
@@ -167,7 +165,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
             SimulationState.TimeOutFrameCount = 5;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
@@ -196,7 +193,6 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
             yield return null;
             DatasetCapture.Instance.ResetSimulation();
             var dcWatcher = new DatasetCapture.WaitUntilComplete();
@@ -228,7 +224,6 @@ namespace GroundTruthTests
 
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 2, 0);
             var sensor = new RgbSensor();
@@ -274,8 +269,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-
-            DatasetCapture.Instance.automaticShutdown = false;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -351,7 +344,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -396,8 +388,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ReportAnnotationFile_WhenCaptureNotExpected_Throws()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
             var sensorHandle = RegisterSensor("camera", "", "", 100, CaptureTriggerMode.Scheduled, 1, 0);
@@ -411,8 +401,6 @@ namespace GroundTruthTests
         [Test]
         public void ReportAnnotationValues_WhenCaptureNotExpected_Throws()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
             var ann = new TestAnnotation()
@@ -485,7 +473,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             SimulationState.TimeOutFrameCount = 100;
 
@@ -508,7 +495,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-            DatasetCapture.Instance.automaticShutdown = false;
 
             SimulationState.TimeOutFrameCount = 10;
 
@@ -533,8 +519,6 @@ namespace GroundTruthTests
         {
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
-
-            DatasetCapture.Instance.automaticShutdown = false;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -586,8 +570,6 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
 
@@ -618,8 +600,7 @@ namespace GroundTruthTests
             // Confirm that the annotation correctly skips the first pending capture to write to the second
             var asyncAnnotation = sensorHandle.ReportAnnotationAsync(def);
             Assert.DoesNotThrow(() => asyncAnnotation.Report(ann));
-
-            yield return null;                            // TODO why does removing this cause us to spiral out for eternity
+            sensorHandle.ReportSensor(sensor);
             DatasetCapture.Instance.ResetSimulation();
 
             var dcWatcher = new DatasetCapture.WaitUntilComplete();
@@ -743,8 +724,6 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var def = new TestMetricDef();
             DatasetCapture.Instance.RegisterMetric(def);
 
@@ -794,7 +773,7 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
+            // DatasetCapture.Instance.automaticShutdown = false;
 
             var def = new TestMetricDef();
             DatasetCapture.Instance.RegisterMetric(def);
@@ -852,7 +831,7 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
+            // DatasetCapture.Instance.automaticShutdown = false;
 
             var values = new[]
             {
@@ -1047,7 +1026,7 @@ namespace GroundTruthTests
             var collector = new CollectEndpoint();
             DatasetCapture.SetEndpoint(collector);
 
-            DatasetCapture.Instance.automaticShutdown = false;
+            // DatasetCapture.Instance.automaticShutdown = false;
 
             if (additionalInfoKind == AdditionalInfoKind.Annotation)
             {

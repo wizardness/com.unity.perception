@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Unity.Collections;
 using Unity.Profiling;
+using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Perception.GroundTruth.DataModel;
@@ -24,7 +26,23 @@ namespace UnityEngine.Perception.GroundTruth
             static readonly string k_Description = "You know the deal";
             static readonly string k_AnnotationType = "instance segmentation";
 
-            public InstanceSegmentationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
+            public InstanceSegmentationDefinition(IdLabelConfig.LabelEntrySpec[] spec)
+                : base(k_Id, k_Description, k_AnnotationType)
+            {
+                this.spec = spec;
+            }
+
+            public IdLabelConfig.LabelEntrySpec[] spec;
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                base.ToMessage(builder);
+                foreach (var e in spec)
+                {
+                    var nested = builder.AddNestedMessageToVector("spec");
+                    // TODO figure out how to generically write the spec to a message builder
+                }
+            }
         }
 
         /// <summary>
@@ -81,7 +99,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
-        InstanceSegmentationDefinition m_Definition = new InstanceSegmentationDefinition();
+        InstanceSegmentationDefinition m_Definition;
 
         ///<inheritdoc/>
         public override string description
@@ -107,7 +125,6 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_OnObjectInfoReceivedCallback = new ProfilerMarker("OnInstanceSegmentationObjectInformationReceived");
         static ProfilerMarker s_OnImageReceivedCallback = new ProfilerMarker("OnInstanceSegmentationImagesReceived");
 
-        Dictionary<int, (AsyncAnnotationFuture future, byte[] buffer)> m_AsyncData;
         Texture m_CurrentTexture;
 
         /// <inheritdoc cref="IOverlayPanelProvider"/>
@@ -133,15 +150,62 @@ namespace UnityEngine.Perception.GroundTruth
 
         string m_InstancePath;
         List<InstanceData> m_InstanceData;
-#if false
+
+        Dictionary<int, AsyncFuture<Annotation>> m_PendingFutures;
+        ConcurrentDictionary<int, List<InstanceSegmentation.Entry>> m_PendingEntries;
+        ConcurrentDictionary<int, byte[]> m_PendingEncodedImages;
+
+        bool ReportFrameIfReady(int frame)
+        {
+            lock (m_PendingEntries)
+            {
+                var entriesReady = m_PendingEntries.ContainsKey(frame);
+                var imgReady = m_PendingEncodedImages.ContainsKey(frame);
+
+                if (!entriesReady || !imgReady) return false;
+
+                if (!m_PendingEntries.TryRemove(frame, out var entries))
+                {
+                    throw new InvalidOperationException($"Could not remove entries for {frame} although it said it was ready");
+                }
+
+                if (!m_PendingEncodedImages.TryRemove(frame, out var img))
+                {
+                    throw new InvalidOperationException($"Could not remove encoded image for {frame} although it said it was ready");
+                }
+
+                var toReport = new InstanceSegmentation
+                {
+                    sensorId = perceptionCamera.ID,
+                    Id = m_Definition.id,
+                    annotationType = m_Definition.annotationType,
+                    description = m_Definition.description,
+                    imageFormat = "png",
+                    instances = entries,
+                    dimension = new Vector2(Screen.width, Screen.height), // TODO figure out how to get this from the camera
+                    buffer = img
+                };
+
+                if (!m_PendingFutures.TryGetValue(frame, out var future))
+                {
+                    throw new InvalidOperationException($"Could not get future for {frame}");
+                }
+
+                future.Report(toReport);
+
+                m_PendingFutures.Remove(frame);
+
+                return true;
+            }
+        }
         struct AsyncWrite
         {
+            public int frame;
             public NativeArray<Color32> data;
             public int width;
             public int height;
-            public string path;
         }
-#endif
+
         /// <summary>
         /// Creates a new InstanceSegmentationLabeler. Be sure to assign <see cref="idLabelConfig"/> before adding to a <see cref="PerceptionCamera"/>.
         /// </summary>
@@ -158,11 +222,6 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnRenderedObjectInfosCalculated(int frame, NativeArray<RenderedObjectInfo> renderedObjectInfos)
         {
-            if (!m_AsyncData.TryGetValue(frame, out var asyncData))
-                return;
-
-            m_AsyncData.Remove(frame);
-
             using (s_OnObjectInfoReceivedCallback.Auto())
             {
                 m_InstanceData.Clear();
@@ -181,76 +240,54 @@ namespace UnityEngine.Perception.GroundTruth
                     });
                 }
 
-                var toReport = new InstanceSegmentation
+                if (!m_PendingEntries.TryAdd(frame, instances))
                 {
-                    sensorId = perceptionCamera.ID,
-                    Id = m_Definition.id,
-                    annotationType = m_Definition.annotationType,
-                    description = m_Definition.description,
-                    imageFormat = "png",
-                    instances = instances,
-                    dimension = new Vector2(Screen.width, Screen.height), // TODO figure out how to get this from the camera
-                    buffer = asyncData.buffer
-                };
+                    throw new InvalidOperationException($"Could not add instances for {frame}");
+                }
 
-                asyncData.future.Report(toReport);
+                ReportFrameIfReady(frame);
             }
         }
 
         void OnImageCaptured(int frameCount, NativeArray<Color32> data, RenderTexture renderTexture)
         {
-            if (!m_AsyncData.TryGetValue(frameCount, out var annotation))
-                return;
-
             using (s_OnImageReceivedCallback.Auto())
             {
                 m_CurrentTexture = renderTexture;
 
-//                m_InstancePath = $"{k_Directory}/{k_FilePrefix}{frameCount}.png";
-//                var localPath = $"{Manager.Instance.GetDirectoryFor(k_Directory)}/{k_FilePrefix}{frameCount}.png";
-
                 var colors = new NativeArray<Color32>(data, Allocator.Persistent);
-#if false
+
                 var asyncRequest = Manager.Instance.CreateRequest<AsyncRequest<AsyncWrite>>();
 
                 asyncRequest.data = new AsyncWrite
                 {
+                    frame = frameCount,
                     data = colors,
                     width = renderTexture.width,
                     height = renderTexture.height,
-                    path = localPath
                 };
 
                 asyncRequest.Enqueue(r =>
                 {
-                    Profiler.BeginSample("InstanceSegmentationEncode");
-                    var pngEncoded = ImageConversion.EncodeArrayToPNG(r.data.data.ToArray(), GraphicsFormat.R8G8B8A8_UNorm, (uint)r.data.width, (uint)r.data.height);
-                    Profiler.EndSample();
-                    Profiler.BeginSample("InstanceSegmentationWritePng");
-                    File.WriteAllBytes(r.data.path, pngEncoded);
-                    Manager.Instance.ConsumerFileProduced(r.data.path);
-                    Profiler.EndSample();
+                    var buffer = ImageConversion.EncodeArrayToPNG(r.data.data.ToArray(), GraphicsFormat.R8G8B8A8_UNorm, (uint)r.data.width, (uint)r.data.height);
                     r.data.data.Dispose();
+
+                    if (!m_PendingEncodedImages.TryAdd(r.data.frame, buffer))
+                    {
+                        throw new InvalidOperationException("Could not add encoded png to pending encoded images");
+                    }
+
+                    ReportFrameIfReady(r.data.frame);
                     return AsyncRequest.Result.Completed;
                 });
                 asyncRequest.Execute();
-#endif
-                annotation.Item2 = ImageConversion.EncodeArrayToPNG(colors.ToArray(), GraphicsFormat.R8G8B8A8_UNorm, (uint)renderTexture.width, (uint)renderTexture.height);
-//                Profiler.EndSample();
-//                Profiler.BeginSample("InstanceSegmentationWritePng");
-//                File.WriteAllBytes(localPath, annotation.Item2);
-//                Manager.Instance.ConsumerFileProduced(localPath);
-//                Profiler.EndSample();
-                colors.Dispose();
-
-                m_AsyncData[frameCount] = annotation;
             }
         }
 
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
-            m_AsyncData[Time.frameCount] = (perceptionCamera.SensorHandle.ReportAnnotationAsync(m_Definition), null);
+            m_PendingFutures[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_Definition);
         }
 
         /// <inheritdoc/>
@@ -259,12 +296,17 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("InstanceSegmentationLabeler's idLabelConfig field must be assigned");
 
+            m_Definition = new InstanceSegmentationDefinition(idLabelConfig.GetAnnotationSpecification());
+            DatasetCapture.Instance.RegisterAnnotationDefinition(m_Definition);
+
             m_InstanceData = new List<InstanceData>();
 
             perceptionCamera.InstanceSegmentationImageReadback += OnImageCaptured;
             perceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
 
-            m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture, byte[])>();
+            m_PendingFutures = new Dictionary<int, AsyncFuture<Annotation>>();
+            m_PendingEntries = new ConcurrentDictionary<int, List<InstanceSegmentation.Entry>>();
+            m_PendingEncodedImages = new ConcurrentDictionary<int, byte[]>();
 
             visualizationEnabled = supportsVisualization;
         }

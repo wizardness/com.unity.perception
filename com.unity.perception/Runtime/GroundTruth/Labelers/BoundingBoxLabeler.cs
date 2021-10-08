@@ -23,33 +23,13 @@ namespace UnityEngine.Perception.GroundTruth
             static readonly string k_Description = "Bounding box for each labeled object visible to the sensor";
             static readonly string k_AnnotationType = "bounding box";
 
-            public BoundingBoxAnnotationDefinition() : base(k_Id, k_Description, k_AnnotationType) { }
-
-            public BoundingBoxAnnotationDefinition(IEnumerable<DefinitionEntry> spec)
+            public BoundingBoxAnnotationDefinition(IdLabelConfig.LabelEntrySpec[] spec)
                 : base(k_Id, k_Description, k_AnnotationType)
             {
                 this.spec = spec;
             }
 
-            [Serializable]
-            public struct DefinitionEntry : IMessageProducer
-            {
-                public DefinitionEntry(int id, string name)
-                {
-                    labelId = id;
-                    labelName = name;
-                }
-
-                public int labelId;
-                public string labelName;
-                public void ToMessage(IMessageBuilder builder)
-                {
-                    builder.AddInt("label_id", labelId);
-                    builder.AddString("label_name", labelName);
-                }
-            }
-
-            public IEnumerable<DefinitionEntry> spec;
+            public IdLabelConfig.LabelEntrySpec[] spec;
 
             public override void ToMessage(IMessageBuilder builder)
             {
@@ -57,7 +37,7 @@ namespace UnityEngine.Perception.GroundTruth
                 foreach (var e in spec)
                 {
                     var nested = builder.AddNestedMessageToVector("spec");
-                    e.ToMessage(nested);
+                    // TODO figure out how to generically write the spec to a message builder
                 }
             }
         }
@@ -135,7 +115,7 @@ namespace UnityEngine.Perception.GroundTruth
         [FormerlySerializedAs("labelingConfiguration")]
         public IdLabelConfig idLabelConfig;
 
-        Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)> m_AsyncData;
+        Dictionary<int, (AsyncFuture<Annotation> annotation, LabelEntryMatchCache labelEntryMatchCache)> m_AsyncData;
         List<BoundingBoxAnnotation.Entry> m_ToVisualize;
 
         Vector2 m_OriginalScreenSize = Vector2.zero;
@@ -189,10 +169,9 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("BoundingBox2DLabeler's idLabelConfig field must be assigned");
 
-            m_AsyncData = new Dictionary<int, (AsyncAnnotationFuture annotation, LabelEntryMatchCache labelEntryMatchCache)>();
+            m_AsyncData = new Dictionary<int, (AsyncFuture<Annotation> annotation, LabelEntryMatchCache labelEntryMatchCache)>();
 
-            var spec = idLabelConfig.GetAnnotationSpecification().Select(i => new BoundingBoxAnnotationDefinition.DefinitionEntry { labelId = i.label_id, labelName = i.label_name });
-            m_AnnotationDefinition = new BoundingBoxAnnotationDefinition(spec);
+            m_AnnotationDefinition = new BoundingBoxAnnotationDefinition(idLabelConfig.GetAnnotationSpecification());
 
             DatasetCapture.Instance.RegisterAnnotationDefinition(m_AnnotationDefinition);
 #if false

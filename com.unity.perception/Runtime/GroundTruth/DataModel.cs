@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using Unity.Mathematics;
 using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 
@@ -8,6 +9,11 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     public interface IMessageProducer
     {
         void ToMessage(IMessageBuilder builder);
+    }
+
+    public abstract class DataModelBase : IMessageProducer
+    {
+        public abstract void ToMessage(IMessageBuilder builder);
     }
 
     /// <summary>
@@ -129,7 +135,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     /// metrics are ready to report for a single frame.
     /// </summary>
     [Serializable]
-    public class Frame : IMessageProducer
+    public class Frame : DataModelBase
     {
         public Frame(int frame, int sequence, int step, float timestamp)
         {
@@ -160,8 +166,12 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         /// </summary>
         public IEnumerable<Sensor> sensors;
 
+        /// <summary>
+        /// A list of all of the metrics recorded recorded for the frame.
+        /// </summary>
+        public List<Metric> metrics = new List<Metric>();
 
-        public void ToMessage(IMessageBuilder builder)
+        public override void ToMessage(IMessageBuilder builder)
         {
             builder.AddInt("frame", frame);
             builder.AddInt("sequence", sequence);
@@ -171,7 +181,11 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
                 var nested = builder.AddNestedMessageToVector("sensors");
                 s.ToMessage(nested);
             }
-
+            foreach (var m in metrics)
+            {
+                var nested = builder.AddNestedMessageToVector("metrics");
+                m.ToMessage(nested);
+            }
         }
     }
 
@@ -179,7 +193,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     /// Abstract sensor class that holds all of the common information for a sensor.
     /// </summary>
     [Serializable]
-    public abstract class Sensor : IMessageProducer
+    public abstract class Sensor : DataModelBase
     {
         /// <summary>
         /// The unique, human readable ID for the sensor.
@@ -209,21 +223,12 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         /// </summary>
         public Vector3 acceleration;
 
-        // TODO put in camera intrinsic
-        // TODO put in projection
-
         /// <summary>
         /// A list of all of the annotations recorded recorded for the frame.
         /// </summary>
         public IEnumerable<Annotation> annotations = new List<Annotation>();
 
-        /// <summary>
-        /// A list of all of the metrics recorded recorded for the frame.
-        /// </summary>
-        public IEnumerable<Metric> metrics = new List<Metric>();
-
-
-        public virtual void ToMessage(IMessageBuilder builder)
+        public override void ToMessage(IMessageBuilder builder)
         {
             builder.AddString("id", Id);
             builder.AddString("sensor_id", sensorType);
@@ -236,12 +241,6 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
             {
                 var nested = builder.AddNestedMessageToVector("annotations");
                 annotation.ToMessage(nested);
-            }
-
-            foreach (var metric in metrics)
-            {
-                var nested = builder.AddNestedMessageToVector("metrics");
-                metric.ToMessage(nested);
             }
         }
     }
@@ -256,6 +255,8 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         {
             PNG
         };
+
+        public string projection;
 
         public float3x3 intrinsics;
 
@@ -274,6 +275,8 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
             builder.AddString("image_format", imageFormat.ToString());
             builder.AddFloatVector("dimension", Utils.ToFloatVector(dimension));
             builder.AddPngImage("camera", buffer);
+            builder.AddString("projection", projection);
+            // TODO intrinsics
         }
     }
 
@@ -282,7 +285,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     /// annotations. Concrete instances of this class will add
     /// data for their specific annotation type.
     /// </summary>
-    public abstract class Annotation : IMessageProducer
+    public abstract class Annotation : DataModelBase
     {
         public Annotation() {}
 
@@ -313,7 +316,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         /// </summary>
         public string annotationType;
 
-        public virtual void ToMessage(IMessageBuilder builder)
+        public override void ToMessage(IMessageBuilder builder)
         {
             builder.AddString("id", Id);
             builder.AddString("sensor_id", sensorId);
@@ -328,7 +331,7 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
     /// data for their specific metric type.
     /// </summary>
     [Serializable]
-    public abstract class Metric : IMessageProducer
+    public abstract class Metric : DataModelBase
     {
         public string Id;
         /// <summary>
@@ -345,7 +348,12 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
         /// </summary>
         public string description;
 
-        public virtual void ToMessage(IMessageBuilder builder)
+        public int sequenceId;
+        public int step;
+
+        public abstract IEnumerable<object> Values { get; }
+
+        public override void ToMessage(IMessageBuilder builder)
         {
             builder.AddString("id", Id);
             builder.AddString("sensor_id", sensorId);
@@ -353,6 +361,22 @@ namespace UnityEngine.Perception.GroundTruth.DataModel
             builder.AddString("description", description);
 
         }
+    }
+
+    public class GenericMetric : Metric
+    {
+        public GenericMetric(string id, string annotationId, int sequenceId, int step, object[] values)
+        {
+            this.Id = id;
+            this.annotationId = annotationId;
+            this.sequenceId = sequenceId;
+            this.step = step;
+            m_Values = values;
+        }
+
+        object[] m_Values;
+
+        public override IEnumerable<object> Values => m_Values;
     }
 
     /// <summary>

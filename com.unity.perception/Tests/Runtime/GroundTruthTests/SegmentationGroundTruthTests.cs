@@ -77,8 +77,6 @@ namespace GroundTruthTests
             [Values(RendererType.MeshRenderer, RendererType.SkinnedMeshRenderer, RendererType.Terrain)] RendererType rendererType,
             [Values(SegmentationKind.Instance, SegmentationKind.Semantic)] SegmentationKind segmentationKind)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             int? frameStart = null;
             GameObject cameraObject = null;
@@ -158,8 +156,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithLensDistortion()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             GameObject cameraObject = null;
             PerceptionCamera perceptionCamera;
             var fLensDistortionEnabled = false;
@@ -243,8 +239,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithLabeledButNotMatchingObject_ProducesBlack()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = new Color32(0, 0, 0, 255);
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -265,8 +259,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithMatchingButDisabledLabel_ProducesBlack()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = new Color32(0, 0, 0, 255);
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -289,8 +281,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator InstanceSegmentationPass_WithMatchingButDisabledLabel_ProducesBlack()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = new Color32(0, 0, 0, 255);
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -313,8 +303,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithEmptyFrame_ProducesSky([Values(false, true)] bool showVisualizations)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = k_SkyValue;
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -348,8 +336,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithNoObjects_ProducesSky()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = k_SkyValue;
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -370,8 +356,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithTextureOverride_RendersToOverride([Values(true, false)] bool showVisualizations)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             var expectedPixelValue = new Color32(0, 0, 255, 255);
             var targetTextureOverride = new RenderTexture(2, 2, 1, RenderTextureFormat.R8);
 
@@ -402,8 +386,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithMultiMaterial_ProducesCorrectValues([Values(true, false)] bool showVisualizations)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = k_SemanticPixelValue;
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -435,8 +417,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator SemanticSegmentationPass_WithChangingLabeling_ProducesCorrectValues([Values(true, false)] bool showVisualizations)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             var expectedPixelValue = k_SemanticPixelValue;
             void OnSegmentationImageReceived(NativeArray<Color32> data)
@@ -466,8 +446,6 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator InstanceSegmentationPass_WithSeparateDisabledPerceptionCamera_ProducesCorrectValues()
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             void OnSegmentationImageReceived(NativeArray<Color32> data)
             {
@@ -492,8 +470,6 @@ namespace GroundTruthTests
         public IEnumerator SegmentationPassProducesCorrectValuesEachFrame(
             [Values(SegmentationKind.Instance, SegmentationKind.Semantic)] SegmentationKind segmentationKind)
         {
-            DatasetCapture.Instance.automaticShutdown = false;
-
             int timesSegmentationImageReceived = 0;
             Dictionary<int, object> expectedLabelAtFrame = null;
 

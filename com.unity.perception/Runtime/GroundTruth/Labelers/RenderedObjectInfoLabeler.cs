@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Profiling;
+using UnityEditor.Profiling.Memory.Experimental;
+using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 using UnityEngine.Rendering;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -16,34 +20,63 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public sealed class RenderedObjectInfoLabeler : CameraLabeler
     {
+        [Serializable]
+        public class MetricDefinition : DataModel.MetricDefinition
+        {
+            public IdLabelConfig.LabelEntrySpec[] spec;
+
+            public MetricDefinition() { }
+
+            public MetricDefinition(string id, string description, IdLabelConfig.LabelEntrySpec[] spec)
+            {
+                this.id = id;
+                this.description = description;
+                this.spec = spec;
+            }
+
+            public override bool IsValid()
+            {
+                return base.IsValid() && spec != null;
+            }
+
+            public override void ToMessage(IMessageBuilder builder)
+            {
+                // TODO stuff for spec
+                base.ToMessage(builder);
+            }
+        }
+
+        [Serializable]
+        public class RenderedObjectInfoMetric : Metric
+        {
+            public override IEnumerable<object> Values => objectInfo;
+
+            public class Entry
+            {
+                [UsedImplicitly]
+                public int label_id;
+                [UsedImplicitly]
+                public uint instance_id;
+                [UsedImplicitly]
+                public Color32 instance_color;
+                [UsedImplicitly]
+                public int visible_pixels;
+            }
+
+            public IEnumerable<Entry> objectInfo;
+        }
+
+        static readonly string k_Id = "RenderedObjectInfo";
+        static readonly string k_Description = "Produces label id, instance id, and visible pixel count in a single metric each frame for each object which takes up one or more pixels in the camera's frame, based on this labeler's associated label configuration.";
+
         ///<inheritdoc/>
         public override string description
         {
-            get => "Produces label id, instance id, and visible pixel count in a single metric each frame for each object which takes up one or more pixels in the camera's frame, based on this labeler's associated label configuration.";
+            get => k_Description;
             protected set {}
         }
 
-        // ReSharper disable InconsistentNaming
-        struct RenderedObjectInfoValue
-        {
-            [UsedImplicitly]
-            public int label_id;
-            [UsedImplicitly]
-            public uint instance_id;
-            [UsedImplicitly]
-            public Color32 instance_color;
-            [UsedImplicitly]
-            public int visible_pixels;
-
-        }
-        // ReSharper restore InconsistentNaming
-
         static ProfilerMarker s_ProduceRenderedObjectInfoMetric = new ProfilerMarker("ProduceRenderedObjectInfoMetric");
-
-        /// <summary>
-        /// The ID to use for visible pixels metrics in the resulting dataset
-        /// </summary>
-        public string objectInfoMetricId = "5ba92024-b3b7-41a7-9d3f-c03a6a8ddd01";
 
         /// <summary>
         /// The <see cref="IdLabelConfig"/> which associates objects with labels.
@@ -51,9 +84,10 @@ namespace UnityEngine.Perception.GroundTruth
         [FormerlySerializedAs("labelingConfiguration")]
         public IdLabelConfig idLabelConfig;
 
-        RenderedObjectInfoValue[] m_VisiblePixelsValues;
-        Dictionary<int, AsyncMetricFuture> m_ObjectInfoAsyncMetrics;
-//        MetricDefinition m_RenderedObjectInfoMetricDefinition;
+        RenderedObjectInfoMetric.Entry[] m_VisiblePixelsValues;
+
+        Dictionary<int, AsyncFuture<Metric>> m_ObjectInfoAsyncMetrics;
+        MetricDefinition m_Definition;
 
         /// <summary>
         /// Creates a new RenderedObjectInfoLabeler. Be sure to assign <see cref="idLabelConfig"/> before adding to a <see cref="PerceptionCamera"/>.
@@ -61,12 +95,16 @@ namespace UnityEngine.Perception.GroundTruth
         public RenderedObjectInfoLabeler()
         {
         }
+
         /// <summary>
         /// Creates a new RenderedObjectInfoLabeler with an <see cref="IdLabelConfig"/>.
         /// </summary>
         /// <param name="idLabelConfig">The <see cref="IdLabelConfig"/> which associates objects with labels. </param>
         public RenderedObjectInfoLabeler(IdLabelConfig idLabelConfig)
         {
+            if (idLabelConfig == null)
+                throw new ArgumentNullException(nameof(idLabelConfig));
+
             this.idLabelConfig = idLabelConfig;
         }
 
@@ -79,12 +117,16 @@ namespace UnityEngine.Perception.GroundTruth
             if (idLabelConfig == null)
                 throw new InvalidOperationException("RenderedObjectInfoLabeler's idLabelConfig field must be assigned");
 
-            m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetricFuture>();
+            m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncFuture<Metric>>();
 
             perceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
                 ProduceRenderedObjectInfoMetric(objectInfo, frameCount);
             };
+
+            m_Definition = new MetricDefinition(k_Id, k_Description, idLabelConfig.GetAnnotationSpecification());
+
+            DatasetCapture.Instance.RegisterMetric(m_Definition);
 
             visualizationEnabled = supportsVisualization;
         }
@@ -92,18 +134,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <inheritdoc/>
         protected override void OnBeginRendering(ScriptableRenderContext scriptableRenderContext)
         {
-#if false
-            if (m_RenderedObjectInfoMetricDefinition.Equals(default))
-            {
-                m_RenderedObjectInfoMetricDefinition = DatasetCapture.RegisterMetricDefinition(
-                    "rendered object info",
-                    idLabelConfig.GetAnnotationSpecification(),
-                    "Information about each labeled object visible to the sensor",
-                    id: new Guid(objectInfoMetricId));
-            }
-
-            m_ObjectInfoAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_RenderedObjectInfoMetricDefinition);
-#endif
+            m_ObjectInfoAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_Definition);
         }
 
         void ProduceRenderedObjectInfoMetric(NativeArray<RenderedObjectInfo> renderedObjectInfos, int frameCount)
@@ -116,7 +147,7 @@ namespace UnityEngine.Perception.GroundTruth
                 m_ObjectInfoAsyncMetrics.Remove(frameCount);
 
                 if (m_VisiblePixelsValues == null || m_VisiblePixelsValues.Length != renderedObjectInfos.Length)
-                    m_VisiblePixelsValues = new RenderedObjectInfoValue[renderedObjectInfos.Length];
+                    m_VisiblePixelsValues = new RenderedObjectInfoMetric.Entry[renderedObjectInfos.Length];
 
                 var visualize = visualizationEnabled;
 
@@ -132,7 +163,7 @@ namespace UnityEngine.Perception.GroundTruth
                     if (!TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
                         continue;
 
-                    m_VisiblePixelsValues[i] = new RenderedObjectInfoValue
+                    m_VisiblePixelsValues[i] = new RenderedObjectInfoMetric.Entry
                     {
                         label_id = labelEntry.id,
                         instance_id = objectInfo.instanceId,
@@ -147,7 +178,20 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                 }
 
-//                metric.Report(m_VisiblePixelsValues);
+                var (seq, step) = DatasetCapture.Instance.GetSequenceAndStepFromFrame(frameCount);
+
+                var payload = new RenderedObjectInfoMetric
+                {
+                    Id = m_Definition.id,
+                    sensorId = perceptionCamera.ID,
+                    annotationId = default,
+                    description = m_Definition.description,
+                    objectInfo = m_VisiblePixelsValues,
+                    sequenceId = seq,
+                    step = step
+                };
+
+                metric.Report(payload);
             }
         }
 

@@ -153,7 +153,7 @@ namespace UnityEngine.Perception.GroundTruth
         LensDistortionUrpPass m_LensDistortionPass;
     #endif
 
-        Dictionary<int, AsyncAnnotationFuture> m_AsyncAnnotations;
+        Dictionary<int, AsyncFuture<Annotation>> m_AsyncAnnotations;
 
         /// <summary>
         /// Creates a new SemanticSegmentationLabeler. Be sure to assign <see cref="labelConfig"/> before adding to a <see cref="PerceptionCamera"/>.
@@ -173,7 +173,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         struct AsyncSemanticSegmentationWrite
         {
-            public AsyncAnnotationFuture future;
+            public AsyncFuture<Annotation> future;
             public NativeArray<Color32> data;
             public int width;
             public int height;
@@ -201,7 +201,7 @@ namespace UnityEngine.Perception.GroundTruth
                     "SemanticSegmentationLabeler's LabelConfig must be assigned");
             }
 
-            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotationFuture>();
+            m_AsyncAnnotations = new Dictionary<int, AsyncFuture<Annotation>>();
 
             if (targetTexture != null)
             {

@@ -205,7 +205,7 @@ namespace UnityEngine.Perception.GroundTruth
         AnnotationDefinition m_AnnotationDefinition;
         Texture2D m_MissingTexture;
 
-        Dictionary<int, (AsyncAnnotationFuture annotation, Dictionary<uint, Annotation.Entry> keypoints)> m_AsyncAnnotations;
+        Dictionary<int, (AsyncFuture<DataModel.Annotation> annotation, Dictionary<uint, Annotation.Entry> keypoints)> m_AsyncAnnotations;
         List<Annotation.Entry> m_KeypointEntriesToReport;
 
         int m_CurrentFrame;
@@ -254,7 +254,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             m_KnownStatus = new Dictionary<uint, CachedData>();
 
-            m_AsyncAnnotations = new Dictionary<int, (AsyncAnnotationFuture, Dictionary<uint, Annotation.Entry>)>();
+            m_AsyncAnnotations = new Dictionary<int, (AsyncFuture<DataModel.Annotation>, Dictionary<uint, Annotation.Entry>)>();
             m_KeypointEntriesToReport = new List<Annotation.Entry>();
             m_CurrentFrame = 0;
 
