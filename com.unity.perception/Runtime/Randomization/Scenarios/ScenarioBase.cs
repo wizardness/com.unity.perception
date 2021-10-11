@@ -351,11 +351,9 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             {
                 foreach (var randomizer in activeRandomizers)
                     randomizer.ScenarioComplete();
-#if false
-                StartCoroutine(OnComplete());
-#else
+
                 OnComplete();
-#endif
+
                 state = State.Idle;
                 OnIdle();
                 return;

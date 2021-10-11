@@ -47,15 +47,11 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         /// <inheritdoc/>
         protected override void OnStart()
         {
-//            Manager.Instance.ShutdownCondition = new ShutdownCondition();
-
             Manager.Instance.ShutdownNotification += () =>
             {
-//                DatasetCapture.Instance.ResetSimulation();
                 Quit();
             };
 
-#if true
             m_IterationMetricDefinition = new MetricDefinition("scenario_iteration", "Iteration information for dataset sequences");
             DatasetCapture.Instance.RegisterMetric(m_IterationMetricDefinition);
 
@@ -63,19 +59,17 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             DatasetCapture.Instance.RegisterMetric(randomSeedMetricDefinition);
 
             DatasetCapture.Instance.ReportMetric(randomSeedMetricDefinition, new object[] { genericConstants.randomSeed });
-#endif
         }
 
         /// <inheritdoc/>
         protected override void OnIterationStart()
         {
             DatasetCapture.Instance.StartNewSequence();
-#if true
+
             DatasetCapture.Instance.ReportMetric(m_IterationMetricDefinition, new object[]
             {
                 new IterationMetricData { iteration = currentIteration }
             });
-#endif
         }
 
         static IEnumerator WaitUntilWritesAreComplete()
@@ -85,24 +79,13 @@ namespace UnityEngine.Perception.Randomization.Scenarios
         }
 
         /// <inheritdoc/>
-
-#if false
-        protected override IEnumerator OnComplete()
-        {
-            yield return StartCoroutine(DatasetCapture.Instance.ResetSimulation());
-#else
         protected override void OnComplete()
         {
             DatasetCapture.Instance.ResetSimulation();
             StartCoroutine(WaitUntilWritesAreComplete());
-
-            //Manager.Instance.ShutdownAfterFrames(105);
-            //Manager.Instance.Shutdown();
-            //DatasetCapture.Instance.ResetSimulation();
-#endif
             Quit();
         }
-#if true
+
         /// <summary>
         /// Used to report a scenario iteration as a perception metric
         /// </summary>
@@ -111,6 +94,5 @@ namespace UnityEngine.Perception.Randomization.Scenarios
             // ReSharper disable once NotAccessedField.Local
             public int iteration;
         }
-#endif
     }
 }

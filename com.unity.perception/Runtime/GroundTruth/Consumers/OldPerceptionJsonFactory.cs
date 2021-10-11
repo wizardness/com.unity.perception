@@ -1,28 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.DataModel;
 
+// ReSharper disable InconsistentNaming
+// ReSharper disable NotAccessedField.Local
 namespace UnityEngine.Perception.GroundTruth.Consumers
 {
     public static class OldPerceptionJsonFactory
     {
-        public static JToken Convert(OldPerceptionConsumer consumer, string id, AnnotationDefinition def)
+        public static JToken Convert(OldPerceptionConsumer consumer, string id, AnnotationDefinition annotationDefinition)
         {
-            switch (def)
+            switch (annotationDefinition)
             {
-                case BoundingBox2DLabeler.BoundingBoxAnnotationDefinition b:
-                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(b, "json", b.spec));
-                case BoundingBox3DLabeler.BoundingBox3DAnnotationDefinition d:
-                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(d, "json", d.spec));
-                case InstanceSegmentationLabeler.InstanceSegmentationDefinition d:
-                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(d, "PNG", d.spec));
-                case SemanticSegmentationLabeler.SemanticSegmentationDefinition d:
-                    return JToken.FromObject(PerceptionSemanticSegmentationAnnotationDefinition.Convert(consumer, d));
+                case BoundingBox2DLabeler.BoundingBoxAnnotationDefinition def:
+                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(def, "json", def.spec));
+                case BoundingBox3DLabeler.BoundingBox3DAnnotationDefinition def:
+                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(def, "json", def.spec));
+                case InstanceSegmentationLabeler.InstanceSegmentationDefinition def:
+                    return JToken.FromObject(LabelConfigurationAnnotationDefinition.Convert(def, "PNG", def.spec));
+                case SemanticSegmentationLabeler.SemanticSegmentationDefinition def:
+                    return JToken.FromObject(PerceptionSemanticSegmentationAnnotationDefinition.Convert(def, "PNG"));
                 case KeypointLabeler.Definition kp:
                     return JToken.FromObject(PerceptionKeypointAnnotationDefinition.Convert(consumer, kp));
             }
@@ -71,94 +72,108 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
             return null;
         }
+    }
 
-        [Serializable]
-        struct LabelConfigurationAnnotationDefinition
+    [Serializable]
+    struct LabelConfigMetricDefinition
+    {
+        LabelConfigMetricDefinition(string id, string name, string description, IdLabelConfig.LabelEntrySpec[] spec)
         {
-            public string id;
-            public string name;
-            public string description;
-            public string format;
-            public IdLabelConfig.LabelEntrySpec[] spec;
-
-            public static LabelConfigurationAnnotationDefinition Convert(AnnotationDefinition def, string format, IdLabelConfig.LabelEntrySpec[] spec)
-            {
-                return new LabelConfigurationAnnotationDefinition
-                {
-                    id = def.id,
-                    name = def.id,
-                    description = def.description,
-                    format = format,
-                    spec = spec
-                };
-            }
+            this.id = id;
+            this.name = name;
+            this.description = description;
+            this.spec = spec;
         }
 
-        [Serializable]
-        struct GenericMetricDefinition
-        {
-            public string id;
-            public string name;
-            public string description;
+        public string id;
+        public string name;
+        public string description;
+        public IdLabelConfig.LabelEntrySpec[] spec;
 
-            public static GenericMetricDefinition Convert(string id, MetricDefinition def)
-            {
-                return new GenericMetricDefinition
-                {
-                    id = id,
-                    name = def.id,
-                    description = def.description
-                };
-            }
+        public JToken ToJToken()
+        {
+            return JToken.FromObject(this);
         }
 
-        struct LabelConfigMetricDefinition
+        public static LabelConfigMetricDefinition Convert(string id, MetricDefinition def, IdLabelConfig.LabelEntrySpec[] spec)
         {
-            public string id;
-            public string name;
-            public string description;
-            public IdLabelConfig.LabelEntrySpec[] spec;
-
-            public static LabelConfigMetricDefinition Convert(string id, MetricDefinition def, IdLabelConfig.LabelEntrySpec[] spec)
-            {
-                return new LabelConfigMetricDefinition
-                {
-                    id = id,
-                    name = def.id,
-                    description = def.description,
-                    spec = spec
-                };
-            }
+            return new LabelConfigMetricDefinition(id, def.id, def.description, spec);
         }
     }
 
     [Serializable]
-    public struct PerceptionKeyPointValue
+    struct LabelConfigurationAnnotationDefinition
+    {
+        public string id;
+        public string name;
+        public string description;
+        public string format;
+        public IdLabelConfig.LabelEntrySpec[] spec;
+
+        LabelConfigurationAnnotationDefinition(AnnotationDefinition def, string format, IdLabelConfig.LabelEntrySpec[] spec)
+        {
+            id = def.id;
+            name = def.id;
+            description = def.description;
+            this.format = format;
+            this.spec = spec;
+        }
+
+        public static LabelConfigurationAnnotationDefinition Convert(AnnotationDefinition def, string format, IdLabelConfig.LabelEntrySpec[] spec)
+        {
+            return new LabelConfigurationAnnotationDefinition(def, format, spec);
+        }
+    }
+
+    [Serializable]
+    struct GenericMetricDefinition
+    {
+        public string id;
+        public string name;
+        public string description;
+
+        public GenericMetricDefinition(string id, MetricDefinition def)
+        {
+            this.id = id;
+            name = def.id;
+            description = def.description;
+        }
+
+        public static GenericMetricDefinition Convert(string id, MetricDefinition def)
+        {
+            return new GenericMetricDefinition(id, def);
+        }
+    }
+
+    [Serializable]
+    struct PerceptionKeyPointValue
     {
         public string id;
         public string annotation_definition;
         public List<Entry> values;
 
         [Serializable]
-        public struct Keypoint
+        internal struct Keypoint
         {
             public int index;
             public Vector2 location;
             public int state;
 
+            Keypoint(KeypointLabeler.Keypoint kp)
+            {
+                index = kp.index;
+                location = kp.location;
+                state = kp.state;
+            }
+
             public static Keypoint Convert(KeypointLabeler.Keypoint kp)
             {
-                return new Keypoint
-                {
-                    index = kp.index,
-                    location = kp.location,
-                    state = kp.state
-                };
+                return new Keypoint(kp);
             }
         }
 
         [Serializable]
-        public struct Entry
+        internal struct Entry
         {
             public int label_id;
             public uint instance_id;
@@ -166,27 +181,31 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             public string pose;
             public Keypoint[] keypoints;
 
+            Entry(KeypointLabeler.Annotation.Entry entry)
+            {
+                label_id = entry.labelId;
+                instance_id = entry.instanceId;
+                template_guid = entry.templateGuid;
+                pose = entry.pose;
+                keypoints = entry.keypoints.Select(Keypoint.Convert).ToArray();
+            }
+
             public static Entry Convert(KeypointLabeler.Annotation.Entry entry)
             {
-                return new Entry
-                {
-                    label_id = entry.labelId,
-                    instance_id = entry.instanceId,
-                    template_guid = entry.templateGuid,
-                    pose = entry.pose,
-                    keypoints = entry.keypoints.Select(Keypoint.Convert).ToArray()
-                };
+                return new Entry(entry);
             }
+        }
+
+        PerceptionKeyPointValue(KeypointLabeler.Annotation kp)
+        {
+            id = kp.Id;
+            annotation_definition = kp.description;
+            values = kp.entries.Select(Entry.Convert).ToList();
         }
 
         public static PerceptionKeyPointValue Convert(OldPerceptionConsumer consumer, KeypointLabeler.Annotation kp)
         {
-            return new PerceptionKeyPointValue
-            {
-                id = kp.Id,
-                annotation_definition = kp.description,
-                values = kp.entries.Select(Entry.Convert).ToList()
-            };
+            return new PerceptionKeyPointValue(kp);
         }
     }
 
@@ -218,23 +237,23 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         }
     }
 
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
     [Serializable]
     struct PerceptionInstanceSegmentationValue
     {
-        [Serializable]
         internal struct Entry
         {
             public int instance_id;
             public Color32 color;
 
+            Entry(InstanceSegmentationLabeler.InstanceSegmentation.Entry entry)
+            {
+                instance_id = entry.instanceId;
+                color = entry.rgba;
+            }
+
             internal static Entry Convert(InstanceSegmentationLabeler.InstanceSegmentation.Entry entry)
             {
-                return new Entry
-                {
-                    instance_id = entry.instanceId,
-                    color = entry.rgba
-                };
+                return new Entry(entry);
             }
         }
 
@@ -242,6 +261,14 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         public string annotation_definition;
         public string filename;
         public List<Entry> values;
+
+        PerceptionInstanceSegmentationValue(OldPerceptionConsumer consumer, int frame, InstanceSegmentationLabeler.InstanceSegmentation annotation)
+        {
+            id = annotation.Id;
+            annotation_definition = annotation.description;
+            filename = consumer.RemoveDatasetPathPrefix(CreateFile(consumer, frame, annotation));
+            values = annotation.instances.Select(Entry.Convert).ToList();
+        }
 
         static string CreateFile(OldPerceptionConsumer consumer, int frame, InstanceSegmentationLabeler.InstanceSegmentation annotation)
         {
@@ -255,23 +282,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
         public static PerceptionInstanceSegmentationValue Convert(OldPerceptionConsumer consumer, int frame, InstanceSegmentationLabeler.InstanceSegmentation annotation)
         {
-            return new PerceptionInstanceSegmentationValue
-            {
-                id = Guid.NewGuid().ToString(),
-                annotation_definition = Guid.NewGuid().ToString(),
-                filename = consumer.RemoveDatasetPathPrefix(CreateFile(consumer, frame, annotation)),
-                values = annotation.instances.Select(Entry.Convert).ToList()
-            };
+            return new PerceptionInstanceSegmentationValue(consumer, frame, annotation);
         }
     }
 
     [Serializable]
-    struct LabelDefinitionEntry
-    {
-        public int label_id;
-        public string label_name;
-    }
-
     struct PerceptionBounding3dBoxAnnotationValue
     {
         [Serializable]
@@ -286,19 +301,21 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             public Vector3 velocity;
             public Vector3 acceleration;
 
+            Entry(BoundingBox3DLabeler.BoundingBoxAnnotation.Entry entry)
+            {
+                label_id = entry.labelId;
+                label_name = entry.labelName;
+                instance_id = entry.instanceId;
+                translation = entry.translation;
+                size = entry.size;
+                rotation = entry.rotation;
+                velocity = entry.velocity;
+                acceleration = entry.acceleration;
+            }
+
             internal static Entry Convert(BoundingBox3DLabeler.BoundingBoxAnnotation.Entry entry)
             {
-                return new Entry
-                {
-                    label_id = entry.labelId,
-                    label_name = entry.labelName,
-                    instance_id = (uint)entry.instanceId,
-                    translation = entry.translation,
-                    size = entry.size,
-                    rotation = entry.rotation,
-                    velocity = entry.velocity,
-                    acceleration = entry.acceleration
-                };
+                return new Entry(entry);
             }
         }
 
@@ -306,33 +323,36 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         public string annotation_definition;
         public List<Entry> values;
 
+        PerceptionBounding3dBoxAnnotationValue(string labelerId, string defId, BoundingBox3DLabeler.BoundingBoxAnnotation annotation)
+        {
+            id = labelerId;
+            annotation_definition = defId;
+            values = annotation.boxes.Select(Entry.Convert).ToList();
+        }
+
         public static PerceptionBounding3dBoxAnnotationValue Convert(OldPerceptionConsumer consumer, string labelerId, string defId, BoundingBox3DLabeler.BoundingBoxAnnotation annotation)
         {
-            return new PerceptionBounding3dBoxAnnotationValue
-            {
-                id = labelerId,
-                annotation_definition = defId,
-                values = annotation.boxes.Select(Entry.Convert).ToList()
-            };
+            return new PerceptionBounding3dBoxAnnotationValue(labelerId, defId, annotation);
         }
     }
 
     [Serializable]
     struct PerceptionSemanticSegmentationAnnotationDefinition
     {
-        [Serializable]
         internal struct Entry
         {
             public string label_name;
             public Color32 pixel_value;
 
+            Entry(SemanticSegmentationLabeler.SemanticSegmentationDefinition.DefinitionEntry e)
+            {
+                label_name = e.labelName;
+                pixel_value = e.pixelValue;
+            }
+
             internal static Entry Convert(SemanticSegmentationLabeler.SemanticSegmentationDefinition.DefinitionEntry e)
             {
-                return new Entry
-                {
-                    label_name = e.labelName,
-                    pixel_value = e.pixelValue
-                };
+                return new Entry(e);
             }
         }
 
@@ -342,16 +362,18 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         public string format;
         public List<Entry> spec;
 
-        public static PerceptionSemanticSegmentationAnnotationDefinition Convert(OldPerceptionConsumer consumer, SemanticSegmentationLabeler.SemanticSegmentationDefinition def)
+        PerceptionSemanticSegmentationAnnotationDefinition(SemanticSegmentationLabeler.SemanticSegmentationDefinition def, string format)
         {
-            return new PerceptionSemanticSegmentationAnnotationDefinition
-            {
-                id = def.id,
-                name = def.id,
-                description = def.description,
-                format = "PNG",
-                spec = def.spec.Select(Entry.Convert).ToList()
-            };
+            id = def.id;
+            name = def.id;
+            description = def.description;
+            spec = def.spec.Select(Entry.Convert).ToList();
+            this.format = format;
+        }
+
+        public static PerceptionSemanticSegmentationAnnotationDefinition Convert(SemanticSegmentationLabeler.SemanticSegmentationDefinition def, string format)
+        {
+            return new PerceptionSemanticSegmentationAnnotationDefinition(def, format);
         }
     }
 
@@ -359,7 +381,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
     struct PerceptionKeypointAnnotationDefinition
     {
         [Serializable]
-        public struct JointJson
+        internal struct JointJson
         {
             public string label;
             public int index;
@@ -377,25 +399,25 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         }
 
         [Serializable]
-        public struct SkeletonJson
+        internal struct SkeletonJson
         {
             public int joint1;
             public int joint2;
             public Color32 color;
 
-            internal static SkeletonJson Convert(KeypointLabeler.Definition.SkeletonDefinition skel)
+            internal static SkeletonJson Convert(KeypointLabeler.Definition.SkeletonDefinition skeleton)
             {
                 return new SkeletonJson
                 {
-                    joint1 = skel.joint1,
-                    joint2 = skel.joint2,
-                    color = skel.color
+                    joint1 = skeleton.joint1,
+                    joint2 = skeleton.joint2,
+                    color = skeleton.color
                 };
             }
         }
 
         [Serializable]
-        public struct KeypointJson
+        internal struct KeypointJson
         {
             public string template_id;
             public string template_name;
@@ -433,7 +455,6 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         }
     }
 
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
     [Serializable]
     struct PerceptionBoundingBoxAnnotationValue
     {

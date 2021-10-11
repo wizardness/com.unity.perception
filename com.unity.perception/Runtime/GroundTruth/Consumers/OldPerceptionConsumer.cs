@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,7 +10,6 @@ using Newtonsoft.Json.Serialization;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.DataModel;
-using Formatting = Newtonsoft.Json.Formatting;
 
 namespace UnityEngine.Perception.GroundTruth.Consumers
 {
@@ -106,18 +104,17 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
     {
         static readonly string version = "0.1.1";
 
-        public string baseDirectory = "D:/PerceptionOutput/KickinItOldSchool";
-        public int capturesPerFile = 150;
-        public int metricsPerFile = 150;
+        const string k_BaseDirectory = "D:/PerceptionOutput/KickinItOldSchool";
+        const int k_CapturesPerFile = 150;
+        const int k_MetricsPerFile = 150;
 
         internal JsonSerializer Serializer { get; }= new JsonSerializer { ContractResolver = new PerceptionResolver()};
 
-        JsonSerializer m_JsonSerializer = new JsonSerializer();
         string m_CurrentPath;
         string m_DatasetPath;
         string m_RgbPath;
-        string m_LogsPath;
 
+        // ReSharper disable NotAccessedField.Local
         [Serializable]
         struct SensorInfo
         {
@@ -125,6 +122,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             public string modality;
             public string description;
         }
+        // ReSharper enable NotAccessedField.Local
 
         Dictionary<string, SensorInfo> m_SensorMap = new Dictionary<string, SensorInfo>();
         Dictionary<string, AnnotationDefinition> m_RegisteredAnnotations = new Dictionary<string, AnnotationDefinition>();
@@ -210,12 +208,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             // Create a directory guid...
             var path = Guid.NewGuid().ToString();
 
-            m_CurrentPath =  Path.Combine(baseDirectory, path);
+            m_CurrentPath =  Path.Combine(k_BaseDirectory, path);
             Directory.CreateDirectory(m_CurrentPath);
 
             m_DatasetPath = VerifyDirectoryWithGuidExists("Dataset");
             m_RgbPath = VerifyDirectoryWithGuidExists("RGB");
-            m_LogsPath = VerifyDirectoryWithGuidExists("Logs", false);
         }
 
         public override void OnFrameGenerated(Frame frame)
@@ -238,13 +235,8 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
                 foreach (var annotation in sensor.annotations)
                 {
-                    string defId = null;
-                    if (!m_RegisteredAnnotations.TryGetValue(annotation.Id, out var def))
-                    {
-                        defId = null;
-                    }
-
-                    defId = def.id;
+                    m_RegisteredAnnotations.TryGetValue(annotation.Id, out var def);
+                    var defId = def?.id ?? string.Empty;
                     var json = OldPerceptionJsonFactory.Convert(this, frame, annotation.Id, defId, annotation);
                     if (json != null) annotations.Add(json);
                 }
@@ -255,26 +247,30 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 AddMetricToReport(metric);
             }
 
-            var capture = new PerceptionCapture
+            // Scenarios report frames before captures, so skip it if a capture is not ready
+            if (rgbSensor != null)
             {
-                id = $"frame_{frame.frame}",
-                filename = RemoveDatasetPathPrefix(path),
-                format = "PNG",
-                sequence_id = seqId,
-                step = frame.step,
-                timestamp = frame.timestamp,
-                sensor =  PerceptionRgbSensor.Convert(this, rgbSensor, path),
-                annotations = annotations
-            };
+                var capture = new PerceptionCapture
+                {
+                    id = $"frame_{frame.frame}",
+                    filename = RemoveDatasetPathPrefix(path),
+                    format = "PNG",
+                    sequence_id = seqId,
+                    step = frame.step,
+                    timestamp = frame.timestamp,
+                    sensor = PerceptionRgbSensor.Convert(rgbSensor),
+                    annotations = annotations
+                };
 
-            m_CurrentCaptures.Add(capture);
+                m_CurrentCaptures.Add(capture);
+            }
 
             WriteCaptures();
         }
 
         void WriteMetrics(bool flush = false)
         {
-            if (flush || m_MetricsReady.Count > metricsPerFile)
+            if (flush || m_MetricsReady.Count > k_MetricsPerFile)
             {
                 WriteMetricsFile(m_MetricOutCount++, m_MetricsReady);
                 m_MetricsReady.Clear();
@@ -283,7 +279,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
         void WriteCaptures(bool flush = false)
         {
-            if (flush || m_CurrentCaptures.Count >= capturesPerFile)
+            if (flush || m_CurrentCaptures.Count >= k_CapturesPerFile)
             {
                 WriteCaptureFile(m_CurrentCaptureIndex++, m_CurrentCaptures);
                 m_CurrentCaptures.Clear();
@@ -300,7 +296,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             WriteMetrics(true);
         }
 
-        int m_CurrentCaptureIndex = 0;
+        int m_CurrentCaptureIndex;
 
         string WriteOutImageFile(int frame, RgbSensor rgb)
         {
@@ -387,7 +383,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             WriteJTokenToFile(path, top);
         }
 
-        JToken ToJtoken(Metric metric)
+        JToken ToJToken(Metric metric)
         {
             string sensorId = null;
             string annotationId = null;
@@ -431,11 +427,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             WriteJTokenToFile(path, top);
         }
 
-        int m_MetricOutCount = 0;
+        int m_MetricOutCount;
         List<JToken> m_MetricsReady = new List<JToken>();
         void AddMetricToReport(Metric metric)
         {
-            m_MetricsReady.Add(ToJtoken(metric));
+            m_MetricsReady.Add(ToJToken(metric));
             WriteMetrics();
         }
 
@@ -452,9 +448,12 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             WriteJTokenToFile(path, top);
         }
 
+        // ReSharper disable NotAccessedField.Local
+        // ReSharper disable InconsistentNaming
         [Serializable]
         struct PerceptionJson
         {
+            // ReSharper disable once MemberHidesStaticFromOuterClass
             public string version;
             public IEnumerable<PerceptionCapture> captures;
         }
@@ -462,11 +461,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         [Serializable]
         struct MetricsJson
         {
+            // ReSharper disable once MemberHidesStaticFromOuterClass
             public string version;
             public IEnumerable<JToken> metrics;
         }
 
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
         [Serializable]
         struct PerceptionCapture
         {
@@ -480,7 +479,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             public JArray annotations;
         }
 
-        public static float[][] ToFloatArray(float3x3 inF3)
+        static float[][] ToFloatArray(float3x3 inF3)
         {
             return new[]
             {
@@ -490,7 +489,6 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             };
         }
 
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
         [Serializable]
         struct PerceptionRgbSensor
         {
@@ -503,7 +501,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             public float[][] camera_intrinsic;
             public string projection;
 
-            public static PerceptionRgbSensor Convert(OldPerceptionConsumer consumer, RgbSensor inRgb, string path)
+            public static PerceptionRgbSensor Convert(RgbSensor inRgb)
             {
                 return new PerceptionRgbSensor
                 {
@@ -518,5 +516,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
                 };
             }
         }
+        // ReSharper enable NotAccessedField.Local
+        // ReSharper enable InconsistentNaming
     }
 }
