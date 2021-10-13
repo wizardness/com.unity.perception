@@ -41,6 +41,11 @@ namespace GroundTruthTests
             return true;
         }
 
+        public override object Clone()
+        {
+            return ScriptableObject.CreateInstance<CollectEndpoint>();
+        }
+
         public override void OnSimulationStarted(SimulationMetadata metadata)
         {
             currentRun = new SimulationRun

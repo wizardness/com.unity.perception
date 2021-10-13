@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.Perception.GroundTruth.DataModel;
-using UnityEngine.Perception.GroundTruth.Exporters;
+using UnityEngine.Perception.Settings;
 
 namespace UnityEditor.Perception.GroundTruth
 {
@@ -30,14 +29,6 @@ namespace UnityEditor.Perception.GroundTruth
             m_LabelersList.drawElementCallback = DrawElement;
             m_LabelersList.onAddCallback += OnAdd;
             m_LabelersList.onRemoveCallback += OnRemove;
-#if false
-            m_OutputMode = PlayerPrefs.GetString(SimulationState.outputFormatMode);
-            m_ExporterList = TypeCache.GetTypesDerivedFrom<IDatasetExporter>().Select(exporter => exporter.Name).ToArray();
-            if (m_ExporterList.Any())
-                m_OutputModeIndex = Array.IndexOf(m_ExporterList, m_OutputMode);
-
-            m_OutputMode = PlayerPrefs.GetString(SimulationState.outputFormatMode, "Perception");
-#endif
         }
 
         float GetElementHeight(int index)
@@ -98,25 +89,6 @@ namespace UnityEditor.Perception.GroundTruth
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.description)), new GUIContent("Description", "Provide a description for this camera (optional)."));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.showVisualizations)), new GUIContent("Show Labeler Visualizations", "Display realtime visualizations for labelers that are currently active on this camera."));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.captureRgbImages)),new GUIContent("Save Camera RGB Output to Disk", "For each captured frame, save an RGB image of the camera's output to disk."));
-#if false
-                if (m_ExporterList.Any())
-                {
-                    if (m_OutputModeIndex < 0)
-                    {
-                        m_OutputMode = nameof(PerceptionExporter);
-                        Debug.LogWarning($"Could not find the output format \'{m_OutputMode}\' in the list of available exporters, setting the exporter to \'{m_OutputMode}\'");
-                        m_OutputModeIndex = Array.IndexOf(m_ExporterList, m_OutputMode);
-                    }
-                    var selected = EditorGUILayout.Popup(new GUIContent("Output Format", ""), m_OutputModeIndex, m_ExporterList);
-
-                    if (m_OutputModeIndex != selected)
-                    {
-                        m_OutputModeIndex = selected;
-                        m_OutputMode = m_ExporterList[selected];
-                        PlayerPrefs.SetString(SimulationState.outputFormatMode, m_OutputMode);
-                    }
-                }
-#endif
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(perceptionCamera.captureTriggerMode)),new GUIContent("Capture Trigger Mode", $"The method of triggering captures for this camera. In {nameof(CaptureTriggerMode.Scheduled)} mode, captures happen automatically based on a start frame and frame delta time. In {nameof(CaptureTriggerMode.Manual)} mode, captures should be triggered manually through calling the {nameof(perceptionCamera.RequestCapture)} method of {nameof(PerceptionCamera)}."));
 
                 GUILayout.Space(5);
@@ -161,69 +133,19 @@ namespace UnityEditor.Perception.GroundTruth
 
                 GUILayout.Space(15);
 
+                if (PerceptionSettings.Endpoint == null)
+                {
+                    EditorGUILayout.HelpBox("Currently there is not a consumer endpoint setup for this simulation. " +
+                        "One can be assigned in Project Settings -> Perception -> Active Endpoint", MessageType.Error);
+                    GUILayout.Space(15);
+                }
+
                 m_LabelersList.DoLayoutList();
             }
 
-            var s = new GUIStyle(EditorStyles.textField);
-            s.wordWrap = true;
-            var defaultColor = s.normal.textColor;
-
-            var dir = PlayerPrefs.GetString(string.Empty, string.Empty);
-            if (dir != string.Empty)
-            {
-                EditorGUILayout.LabelField("Latest Generated Dataset");
-                GUILayout.BeginVertical("TextArea");
-
-                s.normal.textColor = Color.green;
-                EditorGUILayout.LabelField(dir, s);
-
-                GUILayout.BeginHorizontal();
-
-                if (GUILayout.Button("Show Folder"))
-                {
-                    EditorUtility.RevealInFinder(dir);
-                }
-                if (GUILayout.Button("Copy Path"))
-                {
-                    GUIUtility.systemCopyBuffer = dir;
-                }
-                GUILayout.EndHorizontal();
-                GUILayout.EndVertical();
-            }
-
-            GUILayout.Space(10);
-
-            var userBaseDir = PlayerPrefs.GetString(string.Empty, string.Empty);
-            if (userBaseDir == string.Empty)
-            {
-                var folder = PlayerPrefs.GetString(string.Empty, string.Empty);
-                userBaseDir = folder != string.Empty ? folder : Application.persistentDataPath;
-            }
-
-            EditorGUILayout.LabelField("Output Base Folder");
-            GUILayout.BeginVertical("TextArea");
-
-            s.normal.textColor = defaultColor;
-            EditorGUILayout.LabelField(userBaseDir, s);
-
-            GUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("Change Folder"))
-            {
-                var path = EditorUtility.OpenFolderPanel("Choose Output Folder", "", "");
-                if (path.Length != 0)
-                {
-                    Debug.Log($"Chose path: {path}");
-//                    PlayerPrefs.SetString(SimulationState.userBaseDirectoryKey, path);
-                }
-            }
-
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
-
-
             if (EditorSettings.asyncShaderCompilation)
             {
+                GUILayout.Space(15);
                 EditorGUILayout.HelpBox("Asynchronous shader compilation may result in invalid data in beginning frames. " +
                     "This can be disabled in Project Settings -> Editor -> Asynchronous Shader Compilation", MessageType.Warning);
             }
@@ -233,6 +155,7 @@ namespace UnityEditor.Perception.GroundTruth
                 hdRenderPipelineAsset.currentPlatformRenderPipelineSettings.supportedLitShaderMode ==
                 UnityEngine.Rendering.HighDefinition.RenderPipelineSettings.SupportedLitShaderMode.DeferredOnly)
             {
+                GUILayout.Space(15);
                 EditorGUILayout.HelpBox("Deferred Only shader mode is not supported by rendering-based labelers. " +
                     "For correct labeler output, switch Lit Shader Mode to Both or Forward Only in your HD Render Pipeline Asset", MessageType.Error);
             }

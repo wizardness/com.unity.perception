@@ -1,4 +1,5 @@
-﻿using UnityEngine.Perception.GroundTruth.DataModel;
+﻿using System;
+using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.GroundTruth.Consumers
 {
@@ -7,6 +8,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         protected override bool IsComplete()
         {
             return true;
+        }
+
+        public override object Clone()
+        {
+            return CreateInstance<NoOpConsumer>();
         }
 
         public override void OnSimulationStarted(SimulationMetadata metadata)

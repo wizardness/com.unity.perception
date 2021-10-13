@@ -135,6 +135,12 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return true;
         }
 
+        public override object Clone()
+        {
+            var cloned = ScriptableObject.CreateInstance<OldPerceptionConsumer>();
+            return cloned;
+        }
+
         internal string VerifyDirectoryWithGuidExists(string directoryPrefix, bool appendGuid = true)
         {
             var dirs = Directory.GetDirectories(m_CurrentPath);

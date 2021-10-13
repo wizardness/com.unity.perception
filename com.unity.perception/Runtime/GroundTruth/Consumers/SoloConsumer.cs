@@ -8,6 +8,7 @@ using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.GroundTruth.Consumers
 {
+    [CreateAssetMenu(fileName = "SoloConfiguration", menuName = "Perception/Endpoint/Solo Consumer", order = 3)]
     public class SoloConsumer : ConsumerEndpoint
     {
         public string _baseDirectory = "D:/PerceptionOutput/SoloConsumer";
@@ -21,6 +22,14 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         protected override bool IsComplete()
         {
             return m_IsComplete;
+        }
+
+        public override object Clone()
+        {
+            var newOne = ScriptableObject.CreateInstance<SoloConsumer>();
+            newOne._baseDirectory = _baseDirectory;
+            newOne.soloDatasetName = soloDatasetName;
+            return newOne;
         }
 
         public override void OnSimulationStarted(SimulationMetadata metadata)

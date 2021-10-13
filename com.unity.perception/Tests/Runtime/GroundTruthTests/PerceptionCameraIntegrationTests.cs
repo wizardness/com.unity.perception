@@ -60,8 +60,8 @@ namespace GroundTruthTests
             plane2.transform.localPosition = new Vector3(0, 0, 5);
             yield return null;
 
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             DatasetCapture.Instance.ResetSimulation();
 
@@ -82,8 +82,8 @@ namespace GroundTruthTests
         {
             SimulationState.TimeOutFrameCount = 50;
 
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>
@@ -120,8 +120,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator Disabled_GeneratesCorrectDataset()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             SemanticSegmentationLabeler semanticSegmentationLabeler = null;
             SetupCamera(pc =>

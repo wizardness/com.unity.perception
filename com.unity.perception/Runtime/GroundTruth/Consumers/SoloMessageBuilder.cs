@@ -21,6 +21,11 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return true;
         }
 
+        public override object Clone()
+        {
+            return ScriptableObject.CreateInstance<SoloMessageBuilder>();
+        }
+
         SimulationMetadata m_CurrentMetadata;
 
         public override void OnSimulationStarted(SimulationMetadata metadata)

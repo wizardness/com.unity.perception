@@ -91,9 +91,8 @@ namespace GroundTruthTests
             const int delta = 1;
             const int framesBetween = 0;
 
-            var collector = new CollectEndpoint();
-
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var sensorHandle = RegisterSensor(id, modality, def, firstFrame, mode, delta, framesBetween);
             Assert.IsTrue(sensorHandle.IsValid);
@@ -143,8 +142,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ReportCaptureAsync_TimesOut()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
             SimulationState.TimeOutFrameCount = 5;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
@@ -163,8 +162,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ReportCaptureAsync_DoesNotTimeOut()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
             SimulationState.TimeOutFrameCount = 5;
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
@@ -190,8 +189,8 @@ namespace GroundTruthTests
             var sensor = CreateMocRgbCapture();
             sensorHandle.ReportSensor(sensor);
 
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             yield return null;
             DatasetCapture.Instance.ResetSimulation();
@@ -222,8 +221,8 @@ namespace GroundTruthTests
                 (1, 1, 2)
             };
 
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 2, 0);
             var sensor = new RgbSensor();
@@ -267,8 +266,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ReportAnnotation_AddsProperJsonToCapture()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -342,8 +341,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator ReportAnnotationValues_ReportsProperJson()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -471,8 +470,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator AnnotationAsyncInvalid_TimesOut()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             SimulationState.TimeOutFrameCount = 100;
 
@@ -493,8 +492,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator AnnotationAsyncIsValid_ReturnsProperValue()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             SimulationState.TimeOutFrameCount = 10;
 
@@ -517,8 +516,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator AnnotationAsyncReportValue_ReportsProperJson()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var sensorHandle = RegisterSensor("camera", "", "", 0, CaptureTriggerMode.Scheduled, 1, 0);
             var sensor = new RgbSensor();
@@ -567,8 +566,8 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator AnnotationAsyncReportResult_FindsCorrectPendingCaptureAfterStartingNewSequence()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var def = new TestDef();
             DatasetCapture.Instance.RegisterAnnotationDefinition(def);
@@ -611,8 +610,8 @@ namespace GroundTruthTests
         [Test]
         public void CreateAnnotation_MultipleTimes_WritesProperTypeOnce()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var def1 = new TestDef();
             var def2 = new TestDef();
@@ -633,8 +632,8 @@ namespace GroundTruthTests
         [Test]
         public void CreateAnnotation_MultipleTimesWithDifferentParameters_WritesProperTypes()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
             var def1 = new TestDef();
             var def2 = new TestDef2();
 

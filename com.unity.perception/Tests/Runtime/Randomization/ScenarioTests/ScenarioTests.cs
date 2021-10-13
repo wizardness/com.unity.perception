@@ -116,8 +116,8 @@ namespace RandomizationTests.ScenarioTests
         [UnityTest]
         public IEnumerator StartNewDatasetSequenceEveryIteration()
         {
-            var collector = new CollectEndpoint();
-            DatasetCapture.SetEndpoint(collector);
+            var collector = ScriptableObject.CreateInstance<CollectEndpoint>();
+            DatasetCapture.Instance.OverrideEndpoint(collector);
 
             var perceptionCamera = SetupPerceptionCamera();
 

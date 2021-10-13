@@ -108,7 +108,7 @@ namespace UnityEngine.Perception.GroundTruth
         //A sensor will be triggered if sequenceTime is within includeThreshold seconds of the next trigger
         const float k_SimulationTimingAccuracy = 0.01f;
 
-        public SimulationState(Type endpointType)
+        public SimulationState(ConsumerEndpoint endpoint)
         {
             ExecutionState = ExecutionStateType.NotStarted;
 
@@ -118,9 +118,7 @@ namespace UnityEngine.Perception.GroundTruth
                 perceptionVersion = DatasetCapture.PerceptionVersion,
             };
 
-            if (!endpointType.IsSubclassOf(typeof(ConsumerEndpoint)))
-                throw new InvalidOperationException($"Cannot add non-endpoint type {endpointType.Name} to consumer endpoint list");
-            consumerEndpoint = (ConsumerEndpoint)Activator.CreateInstance(endpointType);
+            consumerEndpoint = endpoint;
         }
 
         bool readyToShutdown => !m_PendingFrames.Any();

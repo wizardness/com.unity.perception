@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using Unity.Simulation;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth.Consumers;
 using UnityEngine.Perception.GroundTruth.DataModel;
+using UnityEngine.Perception.Settings;
 
 #pragma warning disable 649
 namespace UnityEngine.Perception.GroundTruth
@@ -83,9 +85,25 @@ namespace UnityEngine.Perception.GroundTruth
 
         internal bool IsValid(string id) => currentSimulation.Contains(id);
 
+        ConsumerEndpoint m_OverrideEndpoint = null;
+        internal void OverrideEndpoint(ConsumerEndpoint endpoint)
+        {
+            m_OverrideEndpoint = endpoint;
+        }
+
+
+#if false
+        // TODO why is this static?
+        public static ConsumerEndpoint[] endpoints => new[] { s_Endpoint };
         static ConsumerEndpoint s_Endpoint;
         //static Type s_EndpointType = typeof(SoloConsumer);
         static Type s_EndpointType = typeof(OldPerceptionConsumer);
+
+        public static void AddEndpoint(ConsumerEndpoint endpoint)
+        {
+            // Only support one for right now
+            SetEndpoint(endpoint);
+        }
 
         public static void SetEndpoint(ConsumerEndpoint endpoint)
         {
@@ -107,12 +125,16 @@ namespace UnityEngine.Perception.GroundTruth
             Debug.Log("Not setting endpoint type");
             return false;
         }
-
-        static SimulationState CreateSimulationData()
+#endif
+        SimulationState CreateSimulationData()
         {
-            if (s_Endpoint != null) return new SimulationState(s_Endpoint.GetType());
-            if (s_EndpointType != null) return new SimulationState(s_EndpointType);
-            throw new InvalidOperationException("Dataset capture cannot create a new simulation state without either a valid consumer endpoint or an endpoint type to instantiate.");
+            if (m_OverrideEndpoint == null && PerceptionSettings.Endpoint == null)
+            {
+                throw new InvalidOperationException("An endpoint has not been set for dataset capture");
+            }
+
+            var endpoint = m_OverrideEndpoint ? m_OverrideEndpoint : PerceptionSettings.Endpoint.Clone();
+            return new SimulationState(endpoint as ConsumerEndpoint);
         }
 
         [RuntimeInitializeOnLoadMethod]

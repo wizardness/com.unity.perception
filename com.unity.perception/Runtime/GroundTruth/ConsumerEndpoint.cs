@@ -6,7 +6,8 @@ using UnityEngine.Perception.GroundTruth.DataModel;
 
 namespace UnityEngine.Perception.GroundTruth
 {
-    public abstract class ConsumerEndpoint
+    [Serializable]
+    public abstract class ConsumerEndpoint : ScriptableObject, ICloneable
     {
         IEnumerator WaitForComplete()
         {
@@ -17,6 +18,7 @@ namespace UnityEngine.Perception.GroundTruth
 #else
         protected abstract bool IsComplete();
 
+        public abstract object Clone();
 
 #endif
         /// <summary>
