@@ -10,7 +10,7 @@ using UnityEngine.Perception.GroundTruth.Exporters.Solo;
 
 namespace UnityEngine.Perception.GroundTruth.Consumers
 {
-    public class SoloMessageBuilder : ConsumerEndpoint
+    public class SoloMessageBuilderEndpoint : ConsumerEndpoint
     {
         public string _baseDirectory = "D:/PerceptionOutput/SoloMessageBuilder";
         public string soloDatasetName = "solo_mb";
@@ -23,7 +23,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
         public override object Clone()
         {
-            return ScriptableObject.CreateInstance<SoloMessageBuilder>();
+            return ScriptableObject.CreateInstance<SoloMessageBuilderEndpoint>();
         }
 
         SimulationMetadata m_CurrentMetadata;
