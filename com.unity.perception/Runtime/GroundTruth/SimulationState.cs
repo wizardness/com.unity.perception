@@ -801,7 +801,7 @@ namespace UnityEngine.Perception.GroundTruth
             m_ActiveSensors.Add(sensorHandle);
             m_Sensors.Add(sensorHandle, sensorData);
 
-            consumerEndpoint.OnSensorRegistered(sensor);
+            consumerEndpoint.SensorRegistered(sensor);
 
             if (ExecutionState == ExecutionStateType.NotStarted)
             {
@@ -917,7 +917,7 @@ namespace UnityEngine.Perception.GroundTruth
                 perceptionVersion = DatasetCapture.PerceptionVersion,
             };
 
-            consumerEndpoint.OnSimulationStarted(m_SimulationMetadata);
+            consumerEndpoint.SimulationStarted(m_SimulationMetadata);
 
             //simulation starts now
             m_FrameCountLastUpdatedSequenceTime = Time.frameCount;
@@ -1062,7 +1062,7 @@ namespace UnityEngine.Perception.GroundTruth
                     totalFrames = m_TotalFrames
                 };
 
-                consumerEndpoint.OnSimulationCompleted(metadata);
+                consumerEndpoint.SimulationCompleted(metadata);
 
                 ExecutionState = ExecutionStateType.NotStarted;
 
@@ -1178,13 +1178,13 @@ namespace UnityEngine.Perception.GroundTruth
         public void RegisterAnnotationDefinition(AnnotationDefinition definition)
         {
             definition.id = RegisterId(definition.id);
-            consumerEndpoint.OnAnnotationRegistered(definition);
+            consumerEndpoint.AnnotationRegistered(definition);
         }
 
         public void RegisterMetric(MetricDefinition definition)
         {
             definition.id = RegisterId(definition.id);
-            consumerEndpoint.OnMetricRegistered(definition);
+            consumerEndpoint.MetricRegistered(definition);
         }
 
         void RegisterAdditionalInfoType<TSpec>(string name, TSpec[] specValues, string description, string format, Guid id, AdditionalInfoKind additionalInfoKind)
@@ -1469,7 +1469,7 @@ namespace UnityEngine.Perception.GroundTruth
                         Debug.LogError("Consumer endpoint is null");
                     }
 
-                    consumerEndpoint.OnFrameGenerated(converted);
+                    consumerEndpoint.FrameGenerated(converted);
                 }
 #else
                 foreach (var pendingFrame in frames)

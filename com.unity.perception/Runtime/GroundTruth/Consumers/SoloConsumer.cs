@@ -32,9 +32,8 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return newOne;
         }
 
-        public override void OnSimulationStarted(SimulationMetadata metadata)
+        public override void SimulationStarted(SimulationMetadata metadata)
         {
-            Debug.Log("SC - On Simulation Started");
             m_CurrentMetadata = metadata;
 
             var i = 0;
@@ -81,7 +80,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             File.WriteAllText(filePath, contents);
         }
 
-        public override void OnFrameGenerated(Frame frame)
+        public override void FrameGenerated(Frame frame)
         {
             var path = GetSequenceDirectoryPath(frame);
             path = Path.Combine(path, $"step{frame.step}.frame_data.json");
@@ -89,7 +88,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             WriteJTokenToFile(path, ToFrame(frame));
         }
 
-        public override void OnSimulationCompleted(CompletionMetadata metadata)
+        public override void SimulationCompleted(CompletionMetadata metadata)
         {
             var path = Path.Combine(currentDirectory, "metadata.json");
             WriteJTokenToFile(path, ToMetadata(metadata));

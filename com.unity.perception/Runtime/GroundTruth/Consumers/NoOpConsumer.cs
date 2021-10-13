@@ -15,17 +15,17 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return CreateInstance<NoOpConsumer>();
         }
 
-        public override void OnSimulationStarted(SimulationMetadata metadata)
+        public override void SimulationStarted(SimulationMetadata metadata)
         {
             // Do nothing, drop everything on the floor
         }
 
-        public override void OnFrameGenerated(Frame frame)
+        public override void FrameGenerated(Frame frame)
         {
             // Do nothing, drop everything on the floor
         }
 
-        public override void OnSimulationCompleted(CompletionMetadata metadata)
+        public override void SimulationCompleted(CompletionMetadata metadata)
         {
             // Do nothing, drop everything on the floor
         }

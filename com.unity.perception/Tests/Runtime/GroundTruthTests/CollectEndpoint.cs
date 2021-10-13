@@ -21,17 +21,17 @@ namespace GroundTruthTests
         public List<SimulationRun> collectedRuns = new List<SimulationRun>();
         public SimulationRun currentRun;
 
-        public override void OnSensorRegistered(SensorDefinition sensor)
+        public override void SensorRegistered(SensorDefinition sensor)
         {
             sensors.Add(sensor);
         }
 
-        public override void OnAnnotationRegistered(AnnotationDefinition annotationDefinition)
+        public override void AnnotationRegistered(AnnotationDefinition annotationDefinition)
         {
             annotationDefinitions.Add(annotationDefinition);
         }
 
-        public override void OnMetricRegistered(MetricDefinition metricDefinition)
+        public override void MetricRegistered(MetricDefinition metricDefinition)
         {
             metricDefinitions.Add(metricDefinition);
         }
@@ -46,7 +46,7 @@ namespace GroundTruthTests
             return ScriptableObject.CreateInstance<CollectEndpoint>();
         }
 
-        public override void OnSimulationStarted(SimulationMetadata metadata)
+        public override void SimulationStarted(SimulationMetadata metadata)
         {
             currentRun = new SimulationRun
             {
@@ -55,7 +55,7 @@ namespace GroundTruthTests
             Debug.Log("Collect Enpoint OnSimulationStarted");
         }
 
-        public override void OnFrameGenerated(Frame frame)
+        public override void FrameGenerated(Frame frame)
         {
             if (currentRun.frames == null)
             {
@@ -66,7 +66,7 @@ namespace GroundTruthTests
             Debug.Log("Collect Enpoint OnFrameGenerted");
         }
 
-        public override void OnSimulationCompleted(CompletionMetadata metadata)
+        public override void SimulationCompleted(CompletionMetadata metadata)
         {
             currentRun.metadata = metadata;
             collectedRuns.Add(currentRun);

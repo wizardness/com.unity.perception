@@ -28,9 +28,8 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
 
         SimulationMetadata m_CurrentMetadata;
 
-        public override void OnSimulationStarted(SimulationMetadata metadata)
+        public override void SimulationStarted(SimulationMetadata metadata)
         {
-            Debug.Log("SC - On Simulation Started");
             m_CurrentMetadata = metadata;
 
             if (!Directory.Exists((_baseDirectory)))
@@ -69,7 +68,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
         JToken m_FrameToken = null;
         Stack<JToken> m_Tokens = new Stack<JToken>();
 
-        public override void OnFrameGenerated(Frame frame)
+        public override void FrameGenerated(Frame frame)
         {
             if (m_FrameToken == null)
             {
@@ -106,10 +105,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             File.WriteAllText(filePath, contents);
         }
 
-        public override void OnSimulationCompleted(CompletionMetadata metadata)
-        {
-            Debug.Log("SC - On Simulation Completed");
-        }
+        public override void SimulationCompleted(CompletionMetadata metadata) { }
 
         class FrameMessageBuilder : IMessageBuilder
         {

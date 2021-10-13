@@ -166,7 +166,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return found;
         }
 
-        public override void OnAnnotationRegistered(AnnotationDefinition annotationDefinition)
+        public override void AnnotationRegistered(AnnotationDefinition annotationDefinition)
         {
             if (m_RegisteredAnnotations.ContainsKey(annotationDefinition.id))
             {
@@ -177,7 +177,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             m_RegisteredAnnotations[annotationDefinition.id] = annotationDefinition;
         }
 
-        public override void OnMetricRegistered(MetricDefinition metricDefinition)
+        public override void MetricRegistered(MetricDefinition metricDefinition)
         {
             if (m_RegisteredMetrics.ContainsKey(metricDefinition.id))
             {
@@ -188,7 +188,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             m_RegisteredMetrics[metricDefinition.id] = metricDefinition;
         }
 
-        public override void OnSensorRegistered(SensorDefinition sensor)
+        public override void SensorRegistered(SensorDefinition sensor)
         {
             if (m_SensorMap.ContainsKey(sensor.id))
             {
@@ -209,7 +209,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             return path.Replace(m_CurrentPath + "\\", string.Empty);
         }
 
-        public override void OnSimulationStarted(SimulationMetadata metadata)
+        public override void SimulationStarted(SimulationMetadata metadata)
         {
             // Create a directory guid...
             var path = Guid.NewGuid().ToString();
@@ -221,7 +221,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             m_RgbPath = VerifyDirectoryWithGuidExists("RGB");
         }
 
-        public override void OnFrameGenerated(Frame frame)
+        public override void FrameGenerated(Frame frame)
         {
             var seqId = frame.sequence.ToString();
 
@@ -292,7 +292,7 @@ namespace UnityEngine.Perception.GroundTruth.Consumers
             }
         }
 
-        public override void OnSimulationCompleted(CompletionMetadata metadata)
+        public override void SimulationCompleted(CompletionMetadata metadata)
         {
             WriteSensorsFile();
             WriteAnnotationsDefinitionsFile();
