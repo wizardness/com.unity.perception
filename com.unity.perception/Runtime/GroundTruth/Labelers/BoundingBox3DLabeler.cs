@@ -12,6 +12,7 @@ namespace UnityEngine.Perception.GroundTruth
     /// <summary>
     /// Produces 3d bounding box ground truth for all visible and <see cref="Labeling"/> objects each frame.
     /// </summary>
+    /// <remarks>The BoundingBox3DLabeler does not support <see cref="SkinnedMeshRenderer"/> objects, they will be ignored.</remarks>
     public class BoundingBox3DLabeler : CameraLabeler
     {
         ///<inheritdoc/>
@@ -119,7 +120,7 @@ namespace UnityEngine.Perception.GroundTruth
         protected override void Setup()
         {
             if (idLabelConfig == null)
-                throw new InvalidOperationException("BoundingBox2DLabeler's idLabelConfig field must be assigned");
+                throw new InvalidOperationException("BoundingBox3DLabeler's idLabelConfig field must be assigned");
 
             m_AnnotationDefinition = DatasetCapture.RegisterAnnotationDefinition("bounding box 3D", idLabelConfig.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));

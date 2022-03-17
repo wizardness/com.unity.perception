@@ -7,16 +7,21 @@
 [![license badge](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE.md)
 
 <img src="https://img.shields.io/badge/unity-2019.4-green.svg?style=flat-square" alt="unity 2019.4">
-<img src="https://img.shields.io/badge/unity-2020.2-green.svg?style=flat-square" alt="unity 2020.2">
+<img src="https://img.shields.io/badge/unity-2020.2-green.svg?style=flat-square" alt="unity 2020.3">
 
-> com.unity.perception is in active development. Its features and API are subject to significant change as development progresses.
+> `com.unity.perception` is in active development. Its features and API are subject to significant change as development progresses.
 
 
 # Perception Package ([Unity Computer Vision](https://unity.com/computer-vision))
 
 The Perception package provides a toolkit for generating large-scale datasets for computer vision training and validation. It is focused on a handful of camera-based use cases for now and will ultimately expand to other forms of sensors and machine learning tasks.
 
-Visit the [Unity Computer Vision](https://unity.com/computer-vision) page for more information on our tools and offerings!
+---
+
+Visit the [Unity Computer Vision](https://unity.com/computer-vision) page for more information on our tools and offerings.
+
+[Join our mailing list](https://create.unity.com/computer-vision-newsletter-sign-up). Sign up now to stay up to date on our latest product feature release, upcoming community events, though-leadership blog posts, and more!
+
 
 ## Getting Started
 
@@ -29,6 +34,9 @@ Detailed instructions covering all the important steps from installing Unity Edi
 **[Human Pose Labeling and Randomization Tutorial](com.unity.perception/Documentation~/HPTutorial/TUTORIAL.md)**  
 Step by step instructions for using the keypoint, pose, and animation randomization tools included in the Perception package. It is recommended that you finish Phase 1 of the Perception Tutorial above before starting this tutorial.
 
+**[FAQ](com.unity.perception/Documentation~/FAQ/FAQ.md)**  
+Check out our FAQ for a list of common questions, tips, tricks, and some sample code.
+
 ## Documentation
 In-depth documentation on individual components of the package. 
 
@@ -39,6 +47,12 @@ In-depth documentation on individual components of the package.
 |[Perception Camera](com.unity.perception/Documentation~/PerceptionCamera.md)|Captures RGB images and ground truth from a [Camera](https://docs.unity3d.com/Manual/class-Camera.html).|
 |[Dataset Capture](com.unity.perception/Documentation~/DatasetCapture.md)|Ensures sensors are triggered at proper rates and accepts data for the JSON dataset.|
 |[Randomization](com.unity.perception/Documentation~/Randomization/Index.md)|The Randomization tool set lets you integrate domain randomization principles into your simulation.|
+
+## Community and Support
+
+For setup problems or discussions about leveraging the Perception package in your project, please create a new thread on the **[Unity Computer Vision forum](https://forum.unity.com/forums/computer-vision.626/)** and make sure to include as much detail as possible. If you run into any other problems with the Perception package or have a specific feature request, please submit a **[GitHub issue](https://github.com/Unity-Technologies/com.unity.perception/issues)**.
+
+For any other questions or feedback, connect directly with the Computer Vision team at [computer-vision@unity3d.com](mailto:computer-vision@unity3d.com).
 
 ## Example Projects
 
@@ -72,12 +86,6 @@ For closest standards conformity and best experience overall, JetBrains Rider or
 
 ## License
 * [License](com.unity.perception/LICENSE.md)
-
-## Community and Feedback
-
-For setup problems or discussions about leveraging the Perception package in your project, please create a new thread on the [Unity Computer Vision forum](https://forum.unity.com/forums/computer-vision.626/) and make sure to include as much detail as possible. If you run into any other problems with the Perception package or have a specific feature request, please submit a [GitHub issue](https://github.com/Unity-Technologies/com.unity.perception/issues).
-
-For any other questions or feedback, connect directly with the Computer Vision team at [computer-vision@unity3d.com](mailto:computer-vision@unity3d.com).
 
 ## Citation
 If you find this package useful, consider citing it using:
