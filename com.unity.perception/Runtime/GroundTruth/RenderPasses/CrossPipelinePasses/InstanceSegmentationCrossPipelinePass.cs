@@ -41,8 +41,8 @@ namespace UnityEngine.Perception.GroundTruth
             base.Setup();
             m_SegmentationShader = Shader.Find(k_SegmentationPassShaderName);
             var shaderVariantCollection = new ShaderVariantCollection();
-            shaderVariantCollection.Add(
-                new ShaderVariantCollection.ShaderVariant(m_SegmentationShader, PassType.ScriptableRenderPipeline));
+            // shaderVariantCollection.Add(
+            //     new ShaderVariantCollection.ShaderVariant(m_SegmentationShader, PassType.ScriptableRenderPipeline));
             shaderVariantCollection.WarmUp();
 
             m_OverrideMaterial = new Material(m_SegmentationShader);
@@ -70,6 +70,14 @@ namespace UnityEngine.Perception.GroundTruth
                 Debug.LogError($"Could not get a unique color for {instanceId}");
 
             mpb.SetVector(k_SegmentationIdProperty, (Color)color);
+
+            if (renderer != null && renderer.material != null && renderer.material.HasProperty("_MainTex"))
+            {
+                var maintex = renderer.material.GetTexture("_MainTex");
+                if (maintex != null)
+                    mpb.SetTexture("_MainTex", renderer.material.GetTexture("_MainTex"));
+            }
+
 #if PERCEPTION_DEBUG
             Debug.Log($"Assigning id. Frame {Time.frameCount} id {id}");
 #endif
